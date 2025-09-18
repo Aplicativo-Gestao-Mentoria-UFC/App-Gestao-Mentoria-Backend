@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python/
+env/
+venv/
+.venv/
+.env
+pip-log.txt
+pip-delete-this-arg.txt
+
+# Editor/IDE specific
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# FastAPI specific
+# If you are using a database, you might want to ignore its files
+# For SQLite, this could be:
+*.db
+*.sqlite3
+
+# Logs and temporary files
+*.log
+tmp/
+temp/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+.coverage
+.tox/
+
+# OS generated files
+.DS_Store
+Thumbs.db
