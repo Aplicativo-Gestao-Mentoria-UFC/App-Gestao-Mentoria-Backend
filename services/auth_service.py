@@ -8,6 +8,7 @@ from core import deps
 from repositories.user_repository import get_user_by_email, get_user_by_username
 from repositories.user_repository import create_user
 from schemas.user_schema import User
+from models.__all_models import UserRole
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
@@ -63,3 +64,11 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
     return user
+
+async def require_role(required_role: UserRole, current_user: User = Depends(get_current_user)):
+    if current_user.role != required_role.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Você não tem permissão para acecessar essa rota",
+        )
+    return current_user
