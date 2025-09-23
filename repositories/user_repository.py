@@ -5,12 +5,12 @@ from schemas.user_schema import User
 
 
 async def get_user_by_username(db: AsyncSession, username: str):
-    result = await db.execute(select(User).filter_by(username=username))
+    result = await db.execute(select(UserModel).filter_by(username=username))
     return result.scalars().first()
 
 
 async def get_user_by_email(db: AsyncSession, email: str):
-    result = await db.execute(select(User).filter_by(email=email))
+    result = await db.execute(select(UserModel).filter_by(email=email))
     return result.scalars().first()
 
 

@@ -9,7 +9,7 @@ from repositories.user_repository import get_user_by_email, get_user_by_username
 from repositories.user_repository import create_user
 from schemas.user_schema import User
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 
 async def authenticate_user(db: AsyncSession, email: str, password: str):
@@ -63,13 +63,3 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
     return user
-
-
-async def get_current_active_user(
-    current_user: User = Depends(get_current_user),
-):
-    if current_user.disabled:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Usuário inativo"
-        )
-    return current_user
