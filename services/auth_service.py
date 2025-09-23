@@ -1,8 +1,17 @@
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from core.security import get_password_hash
+from core.security import get_password_hash, verify_password
 from repositories.user_repository import get_user_by_email, get_user_by_username
 from repositories.user_repository import create_user
+
+async def authenticate_user(db: AsyncSession, email: str, password: str):
+    user = await get_user_by_email(db, email)
+
+    if not user:
+        return False
+    if not verify_password(password, user.hashed_password):
+        return False
+    return user
 
 async def register_user(db: AsyncSession, username: str, email: str, password: str):
     exists_email = await get_user_by_email(db, email)
