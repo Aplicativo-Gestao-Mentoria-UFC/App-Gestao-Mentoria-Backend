@@ -1,8 +1,16 @@
-from fastapi import HTTPException, status
+from typing import Annotated
+from fastapi import HTTPException, Depends, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jose import jwt, exceptions
 from sqlalchemy.ext.asyncio import AsyncSession
 from core.security import get_password_hash, verify_password
+from core.config import settings
+from core import deps
 from repositories.user_repository import get_user_by_email, get_user_by_username
 from repositories.user_repository import create_user
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
 
 async def authenticate_user(db: AsyncSession, email: str, password: str):
     user = await get_user_by_email(db, email)
@@ -13,16 +21,45 @@ async def authenticate_user(db: AsyncSession, email: str, password: str):
         return False
     return user
 
+
 async def register_user(db: AsyncSession, username: str, email: str, password: str):
     exists_email = await get_user_by_email(db, email)
 
     if exists_email:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Já existe um usuário com esse email!")
-    
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Já existe um usuário com esse email!",
+        )
+
     exists_username = await get_user_by_username(db, username)
 
     if exists_username:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Já existe um usuário com esse username!")
-    
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Já existe um usuário com esse username!",
+        )
+
     hashed_password = get_password_hash(password)
-    return await create_user(db, username, email, hashed_password) 
+    return await create_user(db, username, email, hashed_password)
+
+
+async def get_current_user(
+    db: Annotated[AsyncSession, Depends(deps.get_session)],
+    token: Annotated[str, Depends(oauth2_scheme)],
+):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Não foi possível validar as credenciais",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=settings.ALGORITHM)
+        email = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except exceptions.JWTError:
+        raise credentials_exception
+    user = await get_user_by_email(db, email)
+    if user is None:
+        raise credentials_exception
+    return user

@@ -6,6 +6,11 @@ from core import deps
 
 router = APIRouter(prefix="/auth")
 
+
 @router.post("/register")
-async def register(user: user_schema.UserCreate, db: AsyncSession = Depends(deps.get_session)):
-    return await auth_service.register_user(db , user.username, user.email, user.password)
+async def register(
+    user: user_schema.UserCreate, db: AsyncSession = Depends(deps.get_session)
+):
+    return await auth_service.register_user(
+        db, user.username, user.email, user.password
+    )
