@@ -3,7 +3,7 @@ from sqlalchemy import Column, UUID, String
 from core.database import Base
 
 
-class User(Base):
+class UserModel(Base):
     __tablename__ = "users"
 
     id = Column(

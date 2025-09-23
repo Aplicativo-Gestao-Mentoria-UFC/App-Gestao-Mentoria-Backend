@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from models.__all_models import User
+from models.__all_models import UserModel
+from schemas.user_schema import User
 
 
 async def get_user_by_username(db: AsyncSession, username: str):
@@ -20,4 +21,4 @@ async def create_user(
     db.add(user)
     await db.commit()
     await db.refresh(user)
-    return user
+    return User.from_orm(user)
