@@ -23,7 +23,7 @@ async def authenticate_user(db: AsyncSession, email: str, password: str):
     return user
 
 
-async def register_user(db: AsyncSession, username: str, email: str, password: str):
+async def register_user(db: AsyncSession, username: str, email: str, role: UserRole, password: str):
     exists_email = await get_user_by_email(db, email)
 
     if exists_email:
@@ -41,7 +41,7 @@ async def register_user(db: AsyncSession, username: str, email: str, password: s
         )
 
     hashed_password = get_password_hash(password)
-    return await create_user(db, username, email, hashed_password)
+    return await create_user(db, username, email, role, hashed_password)
 
 
 async def get_current_user(
@@ -65,10 +65,12 @@ async def get_current_user(
         raise credentials_exception
     return user
 
-async def require_role(required_role: UserRole, current_user: User = Depends(get_current_user)):
-    if current_user.role != required_role.value:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Você não tem permissão para acecessar essa rota",
-        )
-    return current_user
+def require_role(required_role: UserRole):
+    async def role_checker(current_user: User = Depends(get_current_user)):
+        if current_user.role != required_role:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Você não tem permissão para acecessar essa rota",
+            )
+        return current_user
+    return role_checker
