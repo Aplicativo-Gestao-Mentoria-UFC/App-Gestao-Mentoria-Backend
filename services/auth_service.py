@@ -1,6 +1,6 @@
 from typing import Annotated
 from fastapi import HTTPException, Depends, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, exceptions
 from sqlalchemy.ext.asyncio import AsyncSession
 from core.security import get_password_hash, verify_password
@@ -8,6 +8,7 @@ from core.config import settings
 from core import deps
 from repositories.user_repository import get_user_by_email, get_user_by_username
 from repositories.user_repository import create_user
+from schemas.user_schema import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -63,3 +64,13 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
     return user
+
+
+async def get_current_active_user(
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    if current_user.disabled:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Usuário inativo"
+        )
+    return current_user
