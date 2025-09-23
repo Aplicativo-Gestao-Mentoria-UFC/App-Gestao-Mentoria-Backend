@@ -1,4 +1,3 @@
-from typing import Annotated
 from fastapi import HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, exceptions
@@ -17,9 +16,9 @@ async def authenticate_user(db: AsyncSession, email: str, password: str):
     user = await get_user_by_email(db, email)
 
     if not user:
-        return False
+        return None
     if not verify_password(password, user.hashed_password):
-        return False
+        return None
     return user
 
 
@@ -45,8 +44,8 @@ async def register_user(db: AsyncSession, username: str, email: str, password: s
 
 
 async def get_current_user(
-    db: Annotated[AsyncSession, Depends(deps.get_session)],
-    token: Annotated[str, Depends(oauth2_scheme)],
+    db: AsyncSession = Depends(deps.get_session),
+    token: str = Depends(oauth2_scheme),
 ):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -67,7 +66,7 @@ async def get_current_user(
 
 
 async def get_current_active_user(
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: User = Depends(get_current_user),
 ):
     if current_user.disabled:
         raise HTTPException(

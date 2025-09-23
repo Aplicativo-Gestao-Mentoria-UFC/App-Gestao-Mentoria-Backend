@@ -1,5 +1,6 @@
 from passlib.context import CryptContext
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from jose import jwt
 from core.config import settings
 
@@ -14,9 +15,9 @@ def get_password_hash(password: str):
     return pwd_context.hash(password)
 
 
-def create_acess_token(data: dict, expires_delta: timedelta | None = None):
+def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode = data.copy()
-    sp = timezone("America/Sao_Paulo")
+    sp = ZoneInfo("America/Sao_Paulo")
     if expires_delta:
         expire = datetime.now(tz=sp) + expires_delta
     else:
