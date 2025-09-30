@@ -18,3 +18,11 @@ async def register_class(
     current_user: User = Depends(require_role("ADMIN")),
 ):
     return await course_class_service.create(db, course_class, current_user.id)
+
+
+@router.get("/my-classes")
+async def get_classes(
+    db: AsyncSession = Depends(deps.get_session),
+    current_user: User = Depends(require_role("ADMIN")),
+):
+    return await course_class_service.get_classes(db, current_user.id)

@@ -1,11 +1,13 @@
-from calendar import c
+from operator import or_
+from pydoc import text
+import re
 from models.course_class_model import CourseClassModel
 from schemas.course_class_schema import (
     CourseClass,
-    CourseClassBase,
     CourseClassRegister,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 
 
 async def create(db: AsyncSession, course_class_register: CourseClassRegister):
@@ -19,3 +21,24 @@ async def create(db: AsyncSession, course_class_register: CourseClassRegister):
     await db.commit()
     await db.refresh(course_class)
     return CourseClass.from_orm(course_class)
+
+
+async def get_teacher_classes(db: AsyncSession, teacher_id: str):
+    query = select(CourseClassModel).where(CourseClassModel.teacher_id == teacher_id)
+    result = await db.execute(query)
+    classes = result.scalars().all()
+    return classes
+
+
+async def get_teacher_classes_by_id(
+    db: AsyncSession, teacher_id: str, course_class_id: str
+):
+    query = select(CourseClassModel).where(
+        or_(
+            CourseClassModel.teacher_id == teacher_id,
+            CourseClassModel.id == course_class_id,
+        )
+    )
+
+    result = await db.execute(query)
+    return result.scalars().first()
