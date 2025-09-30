@@ -8,7 +8,7 @@ from services.auth_service import require_role
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-router = APIRouter(prefix="/teacher")
+router = APIRouter(prefix="/teacher", dependencies=[Depends(require_role("ADMIN"))])
 
 
 @router.post("/register-class")
