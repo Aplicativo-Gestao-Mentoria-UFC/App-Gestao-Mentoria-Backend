@@ -4,7 +4,12 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from schemas.user_schema import UserCreate, User
 from schemas.token import Token
-from services.auth_service import authenticate_user, register_user, get_current_user, require_role
+from services.auth_service import (
+    authenticate_user,
+    register_user,
+    get_current_user,
+    require_role,
+)
 from core import deps
 from core.config import settings
 from core.security import create_access_token
@@ -36,6 +41,7 @@ async def login_for_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
     )
     return Token(access_token=access_token, token_type="bearer")
+
 
 @router.get("/me", response_model=User)
 async def read_me(current_user: User = Depends(require_role("ADMIN"))):

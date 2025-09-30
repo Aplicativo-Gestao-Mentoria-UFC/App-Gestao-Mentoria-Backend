@@ -23,7 +23,9 @@ async def authenticate_user(db: AsyncSession, email: str, password: str):
     return user
 
 
-async def register_user(db: AsyncSession, username: str, email: str, role: UserRole, password: str):
+async def register_user(
+    db: AsyncSession, username: str, email: str, role: UserRole, password: str
+):
     exists_email = await get_user_by_email(db, email)
 
     if exists_email:
@@ -65,6 +67,7 @@ async def get_current_user(
         raise credentials_exception
     return user
 
+
 def require_role(required_role: UserRole):
     async def role_checker(current_user: User = Depends(get_current_user)):
         if current_user.role != required_role:
@@ -73,4 +76,5 @@ def require_role(required_role: UserRole):
                 detail="Você não tem permissão para acecessar essa rota",
             )
         return current_user
+
     return role_checker

@@ -1,5 +1,6 @@
 from core.database import engine, Base
 
+
 async def create_tables() -> None:
     from models.__all_models import UserModel
 
@@ -8,7 +9,8 @@ async def create_tables() -> None:
         await conn.run_sync(Base.metadata.create_all)
     print("Tabelas criadas")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     import asyncio
 
     asyncio.run(create_tables())

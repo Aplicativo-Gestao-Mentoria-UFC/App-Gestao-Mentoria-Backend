@@ -3,6 +3,7 @@ from sqlalchemy import Column, UUID, String
 from core.database import Base
 from enum import Enum
 
+
 class UserRole(str, Enum):
     admin = "ADMIN"
     user = "USER"
@@ -16,5 +17,5 @@ class UserModel(Base):
     )
     username = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
-    role = Column(String,  default=UserRole.user.value)
+    role = Column(String, default=UserRole.user.value)
     hashed_password = Column(String, nullable=False)
