@@ -3,6 +3,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     API_STR: str
+    CORS_ORIGINS: str
 
     DB_URL: str
 
