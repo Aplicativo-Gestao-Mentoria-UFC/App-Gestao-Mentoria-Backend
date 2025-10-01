@@ -44,5 +44,5 @@ async def login_for_access_token(
 
 
 @router.get("/me", response_model=User)
-async def read_me(current_user: User = Depends(require_role("ADMIN"))):
+async def read_me(current_user: User = Depends(require_role("TEACHER"))):
     return current_user
