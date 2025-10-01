@@ -23,11 +23,13 @@ async def create(db: AsyncSession, course_class: CourseClassBase, teacher_id: st
 
 
 async def get_classes(
-    db: AsyncSession, teacher_id: str, course_class_id: Optional[str] = None
+    db: AsyncSession, teacher_id: str, course_class_id: Optional[str] = None, **filters
 ):
     try:
         if course_class_id is None:
-            return await course_class_repository.get_teacher_classes(db, teacher_id)
+            return await course_class_repository.get_teacher_classes(
+                db, teacher_id, **filters
+            )
         else:
             course_class = await course_class_repository.get_teacher_class_by_id(
                 db, teacher_id, course_class_id

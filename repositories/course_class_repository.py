@@ -23,9 +23,27 @@ async def create(db: AsyncSession, course_class_register: CourseClassRegister):
     return course_class
 
 
-async def get_teacher_classes(db: AsyncSession, teacher_id: str):
+async def get_teacher_classes(
+    db: AsyncSession,
+    teacher_id: str,
+    name=None,
+    discipline=None,
+    status=None,
+    skip: int = 0,
+    limit: int = 10,
+):
     query = select(CourseClassModel).where(CourseClassModel.teacher_id == teacher_id)
-    result = await db.execute(query)
+
+    if name:
+        query = query.where(CourseClassModel.name.ilike(f"%{name}%"))
+
+    if discipline:
+        query = query.where(CourseClassModel.discipline.ilike(f"%{discipline}%"))
+
+    if status:
+        query = query.where(CourseClassModel.status == status)
+
+    result = await db.execute(query.offset(skip).limit(limit))
     classes = result.scalars().all()
     return classes
 
