@@ -19,6 +19,6 @@ async def get_classes(
     if course_class_id is None:
         return await course_class_repository.get_teacher_classes(db, teacher_id)
     else:
-        return await course_class_repository.get_teacher_classes_by_id(
+        return await course_class_repository.get_teacher_class_by_id(
             db, teacher_id, course_class_id
         )

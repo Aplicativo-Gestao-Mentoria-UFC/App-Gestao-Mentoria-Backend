@@ -30,14 +30,13 @@ async def get_teacher_classes(db: AsyncSession, teacher_id: str):
     return classes
 
 
-async def get_teacher_classes_by_id(
+async def get_teacher_class_by_id(
     db: AsyncSession, teacher_id: str, course_class_id: str
 ):
-    query = select(CourseClassModel).where(
-        or_(
-            CourseClassModel.teacher_id == teacher_id,
-            CourseClassModel.id == course_class_id,
-        )
+    query = (
+        select(CourseClassModel)
+        .where(CourseClassModel.teacher_id == teacher_id)
+        .where(CourseClassModel.id == course_class_id)
     )
 
     result = await db.execute(query)
