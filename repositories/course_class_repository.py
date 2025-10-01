@@ -1,3 +1,4 @@
+from tkinter import NO
 from models.course_class_model import CourseClassModel
 from models.user_model import UserModel
 from schemas.course_class_schema import (
@@ -45,7 +46,7 @@ async def get_teacher_class_by_id(
     result = await db.execute(query)
     course_class = result.scalars().first()
 
-    return CourseClass.from_orm(course_class)
+    return CourseClass.from_orm(course_class) if course_class is not None else None
 
 
 async def add_monitor(
