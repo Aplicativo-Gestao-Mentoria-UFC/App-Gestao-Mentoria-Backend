@@ -19,7 +19,7 @@ async def create(db: AsyncSession, course_class_register: CourseClassRegister):
     db.add(course_class)
     await db.commit()
     await db.refresh(course_class)
-    return CourseClass.from_orm(course_class)
+    return course_class
 
 
 async def get_teacher_classes(db: AsyncSession, teacher_id: str):
@@ -34,13 +34,18 @@ async def get_teacher_class_by_id(
 ):
     query = (
         select(CourseClassModel)
-        .options(selectinload(CourseClassModel.monitor))
+        .options(
+            selectinload(CourseClassModel.monitor),
+            selectinload(CourseClassModel.students),
+        )
         .where(CourseClassModel.teacher_id == teacher_id)
         .where(CourseClassModel.id == course_class_id)
     )
 
     result = await db.execute(query)
-    return result.scalars().first()
+    course_class = result.scalars().first()
+
+    return CourseClass.from_orm(course_class)
 
 
 async def add_monitor(

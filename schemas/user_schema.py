@@ -13,8 +13,11 @@ class UserCreate(UserBase):
     password: str
 
 
-class User(UserBase):
+class User(BaseModel):
     id: uuid.UUID
+    username: str
+    email: EmailStr
+    role: UserRole
 
     class Config:
         from_attributes = True
