@@ -65,7 +65,6 @@ async def add_monitor(
         )
 
     monitor = await user_repository.get_user_by_email(db, email=monitor_email)
-
     if not monitor:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -74,12 +73,53 @@ async def add_monitor(
 
     if monitor in course_class.monitor:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="Esse aluno já é monitor da turma",
         )
 
     try:
         return await course_class_repository.add_monitor(db, course_class, monitor)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erro interno do servidor",
+        )
+
+
+async def add_student(
+    course_class_id: str, student_email: str, db: AsyncSession, teacher_id: str
+):
+    course_class = await course_class_repository.get_teacher_class_by_id(
+        db, teacher_id, course_class_id
+    )
+
+    if not course_class:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Essa turma não existe"
+        )
+
+    if course_class.teacher_id != teacher_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Você não é o responsável por essa turma",
+        )
+
+    student = await user_repository.get_user_by_email(db, email=student_email)
+
+    if not student:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Não existe nenhum estudante com esse email",
+        )
+
+    if student in course_class.students:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Esse aluno já foi adicionado na turma",
+        )
+
+    try:
+        return await course_class_repository.add_student(db, course_class, student)
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -27,5 +27,5 @@ class CourseClass(BaseModel):
         from_attributes = True
 
 
-class AddMonitorSchema(BaseModel):
+class AddStudentSchema(BaseModel):
     email: str

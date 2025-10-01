@@ -1,4 +1,3 @@
-from tkinter import NO
 from models.course_class_model import CourseClassModel
 from models.user_model import UserModel
 from schemas.course_class_schema import (
@@ -64,7 +63,7 @@ async def get_teacher_class_by_id(
     result = await db.execute(query)
     course_class = result.scalars().first()
 
-    return CourseClass.from_orm(course_class) if course_class is not None else None
+    return course_class
 
 
 async def add_monitor(
@@ -73,6 +72,17 @@ async def add_monitor(
     new_monitor: UserModel,
 ):
     course_class.monitor.append(new_monitor)
+    await db.commit()
+    await db.refresh(course_class)
+    return course_class
+
+
+async def add_student(
+    db: AsyncSession,
+    course_class: CourseClassModel,
+    new_student: UserModel,
+):
+    course_class.students.append(new_student)
 
     await db.commit()
     await db.refresh(course_class)
