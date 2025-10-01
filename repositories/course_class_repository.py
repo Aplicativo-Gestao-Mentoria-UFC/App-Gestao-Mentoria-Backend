@@ -1,3 +1,4 @@
+from tkinter import NO
 from models.course_class_model import CourseClassModel
 from models.user_model import UserModel
 from schemas.course_class_schema import (
@@ -22,9 +23,27 @@ async def create(db: AsyncSession, course_class_register: CourseClassRegister):
     return course_class
 
 
-async def get_teacher_classes(db: AsyncSession, teacher_id: str):
+async def get_teacher_classes(
+    db: AsyncSession,
+    teacher_id: str,
+    name=None,
+    discipline=None,
+    status=None,
+    skip: int = 0,
+    limit: int = 10,
+):
     query = select(CourseClassModel).where(CourseClassModel.teacher_id == teacher_id)
-    result = await db.execute(query)
+
+    if name:
+        query = query.where(CourseClassModel.name.ilike(f"%{name}%"))
+
+    if discipline:
+        query = query.where(CourseClassModel.discipline.ilike(f"%{discipline}%"))
+
+    if status:
+        query = query.where(CourseClassModel.status == status)
+
+    result = await db.execute(query.offset(skip).limit(limit))
     classes = result.scalars().all()
     return classes
 
@@ -45,7 +64,7 @@ async def get_teacher_class_by_id(
     result = await db.execute(query)
     course_class = result.scalars().first()
 
-    return CourseClass.from_orm(course_class)
+    return CourseClass.from_orm(course_class) if course_class is not None else None
 
 
 async def add_monitor(

@@ -12,18 +12,38 @@ async def create(db: AsyncSession, course_class: CourseClassBase, teacher_id: st
         discipline=course_class.discipline,
         teacher_id=teacher_id,
     )
-    return await course_class_repository.create(db, course_class_register)
+
+    try:
+        return await course_class_repository.create(db, course_class_register)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erro interno do servidor",
+        )
 
 
 async def get_classes(
-    db: AsyncSession, teacher_id: str, course_class_id: Optional[str] = None
+    db: AsyncSession, teacher_id: str, course_class_id: Optional[str] = None, **filters
 ):
-    if course_class_id is None:
-        return await course_class_repository.get_teacher_classes(db, teacher_id)
-    else:
-        return await course_class_repository.get_teacher_class_by_id(
-            db, teacher_id, course_class_id
-        )
+    try:
+        if course_class_id is None:
+            return await course_class_repository.get_teacher_classes(
+                db, teacher_id, **filters
+            )
+        else:
+            course_class = await course_class_repository.get_teacher_class_by_id(
+                db, teacher_id, course_class_id
+            )
+
+            if course_class is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Turma não encontrada"
+                )
+
+            return course_class
+
+    except Exception as e:
+        raise e
 
 
 async def add_monitor(
@@ -58,4 +78,10 @@ async def add_monitor(
             detail="Esse aluno já é monitor da turma",
         )
 
-    return await course_class_repository.add_monitor(db, course_class, monitor)
+    try:
+        return await course_class_repository.add_monitor(db, course_class, monitor)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erro interno do servidor",
+        )
