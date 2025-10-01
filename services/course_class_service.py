@@ -58,6 +58,4 @@ async def add_monitor(
             detail="Esse aluno já é monitor da turma",
         )
 
-    return await course_class_repository.add_monitor(
-        db, course_class, teacher_id, monitor
-    )
+    return await course_class_repository.add_monitor(db, course_class, monitor)

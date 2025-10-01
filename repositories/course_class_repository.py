@@ -1,4 +1,3 @@
-from fastapi import HTTPException, status
 from models.course_class_model import CourseClassModel
 from models.user_model import UserModel
 from schemas.course_class_schema import (
@@ -47,7 +46,6 @@ async def get_teacher_class_by_id(
 async def add_monitor(
     db: AsyncSession,
     course_class: CourseClassModel,
-    teacher_id: str,
     new_monitor: UserModel,
 ):
     course_class.monitor.append(new_monitor)

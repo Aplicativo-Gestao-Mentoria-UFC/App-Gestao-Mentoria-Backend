@@ -17,3 +17,7 @@ class CourseClass(CourseClassBase):
 
     class Config:
         from_attributes = True
+
+
+class AddMonitorSchema(BaseModel):
+    email: str
