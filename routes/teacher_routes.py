@@ -36,3 +36,15 @@ async def get_teacher_class_by_id(
     current_user: User = Depends(require_role("TEACHER")),
 ):
     return await course_class_service.get_classes(db, current_user.id, course_class_id)
+
+
+@router.patch("/{course_class_id}/add-monitor")
+async def add_monitor(
+    course_class_id: str,
+    monitor_email: str,
+    db: AsyncSession = Depends(deps.get_session),
+    current_user: User = Depends(require_role("TEACHER")),
+):
+    return await course_class_service.add_monitor(
+        course_class_id, monitor_email, db, current_user.id
+    )

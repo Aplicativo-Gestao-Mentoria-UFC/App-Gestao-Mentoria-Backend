@@ -7,7 +7,6 @@ from schemas.token import Token
 from services.auth_service import (
     authenticate_user,
     register_user,
-    get_current_user,
     require_role,
 )
 from core import deps

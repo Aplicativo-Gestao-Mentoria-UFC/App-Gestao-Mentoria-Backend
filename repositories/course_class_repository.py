@@ -1,13 +1,13 @@
-from operator import or_
-from pydoc import text
-import re
+from fastapi import HTTPException, status
 from models.course_class_model import CourseClassModel
+from models.user_model import UserModel
 from schemas.course_class_schema import (
     CourseClass,
     CourseClassRegister,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 
 
 async def create(db: AsyncSession, course_class_register: CourseClassRegister):
@@ -35,9 +35,23 @@ async def get_teacher_class_by_id(
 ):
     query = (
         select(CourseClassModel)
+        .options(selectinload(CourseClassModel.monitor))
         .where(CourseClassModel.teacher_id == teacher_id)
         .where(CourseClassModel.id == course_class_id)
     )
 
     result = await db.execute(query)
     return result.scalars().first()
+
+
+async def add_monitor(
+    db: AsyncSession,
+    course_class: CourseClassModel,
+    teacher_id: str,
+    new_monitor: UserModel,
+):
+    course_class.monitor.append(new_monitor)
+
+    await db.commit()
+    await db.refresh(course_class)
+    return course_class
