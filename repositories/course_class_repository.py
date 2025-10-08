@@ -97,3 +97,13 @@ async def remove_monitor(
     await db.commit()
     await db.refresh(course_class)
     return course_class
+
+
+async def remove_student(
+    db: AsyncSession, course_class: CourseClassModel, student: UserModel
+):
+    course_class.students.remove(student)
+
+    await db.commit()
+    await db.refresh(course_class)
+    return course_class
