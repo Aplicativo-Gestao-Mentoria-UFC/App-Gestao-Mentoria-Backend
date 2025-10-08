@@ -125,3 +125,41 @@ async def add_student(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Erro interno do servidor",
         )
+
+
+async def remove_monitor(
+    course_class_id: str,
+    monitor_id: str,
+    db: AsyncSession,
+    teacher_id: str,
+):
+    course_class = await course_class_repository.get_teacher_class_by_id(
+        db, teacher_id, course_class_id
+    )
+
+    if not course_class:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Essa turma não existe"
+        )
+
+    if course_class.teacher_id != teacher_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Você não é o responsável por essa turma",
+        )
+
+    monitor = await user_repository.get_user_by_id(db, id=monitor_id)
+
+    if not monitor in course_class.monitor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="O monitor não faz parte dessa turma",
+        )
+
+    try:
+        return await course_class_repository.remove_monitor(db, course_class, monitor)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erro interno do servidor",
+        )

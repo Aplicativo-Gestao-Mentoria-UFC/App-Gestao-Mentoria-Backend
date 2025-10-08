@@ -72,3 +72,15 @@ async def add_student(
     return await course_class_service.add_student(
         course_class_id, data.email, db, current_user.id
     )
+
+
+@router.patch("/my-classes/{course_class_id}/remove-monitor")
+async def remove_monitor(
+    course_class_id: str,
+    monitor_id: str,
+    db: AsyncSession = Depends(deps.get_session),
+    current_user: User = Depends(require_role("TEACHER")),
+):
+    return await course_class_service.remove_monitor(
+        course_class_id, monitor_id, db, current_user.id
+    )
