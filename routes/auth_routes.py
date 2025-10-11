@@ -6,6 +6,7 @@ from schemas.user_schema import UserCreate, User
 from schemas.token import Token
 from services.auth_service import (
     authenticate_user,
+    get_current_user,
     register_user,
     require_role,
 )
@@ -43,5 +44,5 @@ async def login_for_access_token(
 
 
 @router.get("/me", response_model=User)
-async def read_me(current_user: User = Depends(require_role("TEACHER"))):
+async def read_me(current_user: User = Depends(get_current_user)):
     return current_user
