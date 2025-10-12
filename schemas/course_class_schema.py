@@ -29,3 +29,7 @@ class CourseClass(BaseModel):
 
 class AddStudentSchema(BaseModel):
     email: str
+
+
+class RemoveStudentSchema(BaseModel):
+    student_id: str
