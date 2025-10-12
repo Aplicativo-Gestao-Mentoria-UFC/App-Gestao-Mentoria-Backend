@@ -2,7 +2,11 @@ from typing import Optional
 
 from fastapi import HTTPException, status
 from repositories import course_class_repository, user_repository
-from schemas.course_class_schema import CourseClassBase, CourseClassRegister
+from schemas.course_class_schema import (
+    CourseClass,
+    CourseClassBase,
+    CourseClassRegister,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -47,21 +51,10 @@ async def get_classes(
 
 
 async def add_monitor(
-    course_class_id: str, monitor_email: str, db: AsyncSession, teacher_id: str
+    course_class: CourseClass,
+    monitor_email: str,
+    db: AsyncSession,
 ):
-    course_class = await course_class_repository.get_class_by_id(db, course_class_id)
-
-    if not course_class:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Essa turma não existe"
-        )
-
-    if course_class.teacher_id != teacher_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Você não é o responsável por essa turma",
-        )
-
     monitor = await user_repository.get_user_by_email(db, email=monitor_email)
     if not monitor:
         raise HTTPException(
@@ -85,21 +78,10 @@ async def add_monitor(
 
 
 async def add_student(
-    course_class_id: str, student_email: str, db: AsyncSession, teacher_id: str
+    course_class: CourseClass,
+    student_email: str,
+    db: AsyncSession,
 ):
-    course_class = await course_class_repository.get_class_by_id(db, course_class_id)
-
-    if not course_class:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Essa turma não existe"
-        )
-
-    if course_class.teacher_id != teacher_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Você não é o responsável por essa turma",
-        )
-
     student = await user_repository.get_user_by_email(db, email=student_email)
 
     if not student:
@@ -124,24 +106,10 @@ async def add_student(
 
 
 async def remove_monitor(
-    course_class_id: str,
+    course_class: CourseClass,
     monitor_id: str,
     db: AsyncSession,
-    teacher_id: str,
 ):
-    course_class = await course_class_repository.get_class_by_id(db, course_class_id)
-
-    if not course_class:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Essa turma não existe"
-        )
-
-    if course_class.teacher_id != teacher_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Você não é o responsável por essa turma",
-        )
-
     monitor = await user_repository.get_user_by_id(db, id=monitor_id)
 
     if not monitor in course_class.monitor:
@@ -160,24 +128,10 @@ async def remove_monitor(
 
 
 async def remove_student(
-    course_class_id: str,
+    course_class: CourseClass,
     student_id: str,
     db: AsyncSession,
-    teacher_id: str,
 ):
-    course_class = await course_class_repository.get_class_by_id(db, course_class_id)
-
-    if not course_class:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Essa turma não existe"
-        )
-
-    if course_class.teacher_id != teacher_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Você não é o responsável por essa turma",
-        )
-
     student = await user_repository.get_user_by_id(db, id=student_id)
 
     if not student in course_class.students:

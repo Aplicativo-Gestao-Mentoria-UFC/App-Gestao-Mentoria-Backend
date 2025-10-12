@@ -2,10 +2,15 @@ from typing import Optional
 from fastapi import APIRouter, Depends
 
 from core import deps
-from schemas.course_class_schema import AddStudentSchema, CourseClassBase
+from schemas.course_class_schema import (
+    AddStudentSchema,
+    CourseClass,
+    CourseClassBase,
+    RemoveStudentSchema,
+)
 from schemas.user_schema import User
 from services import course_class_service
-from services.auth_service import require_role
+from services.auth_service import require_role, require_teacher_class
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/teacher", dependencies=[Depends(require_role("TEACHER"))])
@@ -52,47 +57,39 @@ async def get_teacher_class_by_id(
 
 @router.put("/my-classes/{course_class_id}/add-monitor")
 async def add_monitor(
-    course_class_id: str,
     data: AddStudentSchema,
+    course_class: CourseClass = Depends(require_teacher_class()),
     db: AsyncSession = Depends(deps.get_session),
-    current_user: User = Depends(require_role("TEACHER")),
 ):
     return await course_class_service.add_monitor(
-        course_class_id, data.email, db, current_user.id
-    )
-
-
-@router.put("/my-classes/{course_class_id}/add-student")
-async def add_student(
-    course_class_id: str,
-    data: AddStudentSchema,
-    db: AsyncSession = Depends(deps.get_session),
-    current_user: User = Depends(require_role("TEACHER")),
-):
-    return await course_class_service.add_student(
-        course_class_id, data.email, db, current_user.id
+        course_class,
+        data.email,
+        db,
     )
 
 
 @router.patch("/my-classes/{course_class_id}/remove-monitor")
 async def remove_monitor(
-    course_class_id: str,
-    monitor_id: str,
+    data: RemoveStudentSchema,
+    course_class: CourseClass = Depends(require_teacher_class()),
     db: AsyncSession = Depends(deps.get_session),
-    current_user: User = Depends(require_role("TEACHER")),
 ):
-    return await course_class_service.remove_monitor(
-        course_class_id, monitor_id, db, current_user.id
-    )
+    return await course_class_service.remove_monitor(course_class, data.student_id, db)
+
+
+@router.put("/my-classes/{course_class_id}/add-student")
+async def add_student(
+    data: AddStudentSchema,
+    course_class: CourseClass = Depends(require_teacher_class()),
+    db: AsyncSession = Depends(deps.get_session),
+):
+    return await course_class_service.add_student(course_class, data.email, db)
 
 
 @router.patch("/my-classes/{course_class_id}/remove-student")
 async def remove_student(
-    course_class_id: str,
-    student_id: str,
+    data: RemoveStudentSchema,
+    course_class: CourseClass = Depends(require_teacher_class()),
     db: AsyncSession = Depends(deps.get_session),
-    current_user: User = Depends(require_role("TEACHER")),
 ):
-    return await course_class_service.remove_student(
-        course_class_id, student_id, db, current_user.id
-    )
+    return await course_class_service.remove_student(course_class, data.student_id, db)
