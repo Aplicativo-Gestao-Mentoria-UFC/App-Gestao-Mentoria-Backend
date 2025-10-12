@@ -1,7 +1,6 @@
 from models.course_class_model import CourseClassModel
 from models.user_model import UserModel
 from schemas.course_class_schema import (
-    CourseClass,
     CourseClassRegister,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -47,16 +46,13 @@ async def get_teacher_classes(
     return classes
 
 
-async def get_teacher_class_by_id(
-    db: AsyncSession, teacher_id: str, course_class_id: str
-):
+async def get_class_by_id(db: AsyncSession, course_class_id: str):
     query = (
         select(CourseClassModel)
         .options(
             selectinload(CourseClassModel.monitor),
             selectinload(CourseClassModel.students),
         )
-        .where(CourseClassModel.teacher_id == teacher_id)
         .where(CourseClassModel.id == course_class_id)
     )
 

@@ -31,8 +31,8 @@ async def get_classes(
                 db, teacher_id, **filters
             )
         else:
-            course_class = await course_class_repository.get_teacher_class_by_id(
-                db, teacher_id, course_class_id
+            course_class = await course_class_repository.get_class_by_id(
+                db, course_class_id
             )
 
             if course_class is None:
@@ -49,9 +49,7 @@ async def get_classes(
 async def add_monitor(
     course_class_id: str, monitor_email: str, db: AsyncSession, teacher_id: str
 ):
-    course_class = await course_class_repository.get_teacher_class_by_id(
-        db, teacher_id, course_class_id
-    )
+    course_class = await course_class_repository.get_class_by_id(db, course_class_id)
 
     if not course_class:
         raise HTTPException(
@@ -89,9 +87,7 @@ async def add_monitor(
 async def add_student(
     course_class_id: str, student_email: str, db: AsyncSession, teacher_id: str
 ):
-    course_class = await course_class_repository.get_teacher_class_by_id(
-        db, teacher_id, course_class_id
-    )
+    course_class = await course_class_repository.get_class_by_id(db, course_class_id)
 
     if not course_class:
         raise HTTPException(
@@ -133,9 +129,7 @@ async def remove_monitor(
     db: AsyncSession,
     teacher_id: str,
 ):
-    course_class = await course_class_repository.get_teacher_class_by_id(
-        db, teacher_id, course_class_id
-    )
+    course_class = await course_class_repository.get_class_by_id(db, course_class_id)
 
     if not course_class:
         raise HTTPException(
@@ -171,9 +165,7 @@ async def remove_student(
     db: AsyncSession,
     teacher_id: str,
 ):
-    course_class = await course_class_repository.get_teacher_class_by_id(
-        db, teacher_id, course_class_id
-    )
+    course_class = await course_class_repository.get_class_by_id(db, course_class_id)
 
     if not course_class:
         raise HTTPException(
