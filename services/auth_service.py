@@ -5,8 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.security import get_password_hash, verify_password
 from core.config import settings
 from core import deps
-from repositories.user_repository import get_user_by_email, get_user_by_username
-from repositories.user_repository import create_user
+from repositories.user_repository import (
+    get_user_by_email,
+    get_user_by_username,
+    create_user,
+)
+from repositories.course_class_repository import get_class_by_id
 from schemas.user_schema import User
 from models.__all_models import UserRole
 
@@ -78,3 +82,27 @@ def require_role(required_role: UserRole):
         return current_user
 
     return role_checker
+
+
+def require_teacher_class():
+    async def checker(
+        course_class_id: str,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(deps.get_session),
+    ):
+        course_class = await get_class_by_id(db, course_class_id)
+
+        if not course_class:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Essa turma não existe"
+            )
+
+        if course_class.teacher_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Você não é o responsável por essa turma",
+            )
+
+        return course_class
+
+    return checker
