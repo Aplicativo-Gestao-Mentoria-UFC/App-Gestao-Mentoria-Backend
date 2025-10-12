@@ -137,7 +137,7 @@ async def remove_student(
     if not student in course_class.students:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="O monitor não faz parte dessa turma",
+            detail="O aluno não faz parte dessa turma",
         )
 
     try:
