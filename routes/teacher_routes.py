@@ -74,7 +74,8 @@ async def remove_monitor(
     course_class: CourseClass = Depends(require_teacher_class()),
     db: AsyncSession = Depends(deps.get_session),
 ):
-    return await course_class_service.remove_monitor(course_class, data.student_id, db)
+    monitor_id = deps.validate_uuid(data.student_id)
+    return await course_class_service.remove_monitor(course_class, monitor_id, db)
 
 
 @router.put("/my-classes/{course_class_id}/add-student")
@@ -92,4 +93,5 @@ async def remove_student(
     course_class: CourseClass = Depends(require_teacher_class()),
     db: AsyncSession = Depends(deps.get_session),
 ):
-    return await course_class_service.remove_student(course_class, data.student_id, db)
+    student_id = deps.validate_uuid(data.student_id)
+    return await course_class_service.remove_student(course_class, student_id, db)

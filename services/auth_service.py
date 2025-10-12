@@ -90,7 +90,8 @@ def require_teacher_class():
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(deps.get_session),
     ):
-        course_class = await get_class_by_id(db, course_class_id)
+        course_class_uuid = deps.validate_uuid(course_class_id)
+        course_class = await get_class_by_id(db, course_class_uuid)
 
         if not course_class:
             raise HTTPException(
