@@ -9,3 +9,10 @@ class ActivityBase(BaseModel):
 
 class ActivityRegister(ActivityBase):
     course_class_id: uuid.UUID
+
+
+class Activity(ActivityBase):
+    id: uuid.UUID
+
+    class Config:
+        from_attributes = True

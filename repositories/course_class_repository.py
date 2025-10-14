@@ -1,6 +1,7 @@
 from models.course_class_model import CourseClassModel
 from models.user_model import UserModel
 from schemas.course_class_schema import (
+    CourseClass,
     CourseClassRegister,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,6 +51,7 @@ async def get_class_by_id(db: AsyncSession, course_class_id: str):
     query = (
         select(CourseClassModel)
         .options(
+            selectinload(CourseClassModel.activities),
             selectinload(CourseClassModel.monitor),
             selectinload(CourseClassModel.students),
         )
@@ -59,7 +61,7 @@ async def get_class_by_id(db: AsyncSession, course_class_id: str):
     result = await db.execute(query)
     course_class = result.scalars().first()
 
-    return course_class
+    return CourseClass.from_orm(course_class)
 
 
 async def add_monitor(

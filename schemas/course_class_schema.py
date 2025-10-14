@@ -3,6 +3,7 @@ import uuid
 from pydantic import BaseModel
 
 from schemas.user_schema import User
+from schemas.activity_schema import Activity
 
 
 class CourseClassBase(BaseModel):
@@ -20,6 +21,7 @@ class CourseClass(BaseModel):
     discipline: str
     teacher_id: uuid.UUID
     status: str
+    activities: Optional[List[Activity]] = []
     monitor: Optional[List[User]] = []
     students: Optional[List[User]] = []
 
