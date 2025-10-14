@@ -7,7 +7,7 @@ course_class_monitors = Table(
     "course_class_monitors",
     Base.metadata,
     Column("course_class_id", UUID(as_uuid=True), ForeignKey("course_class.id")),
-    Column("monitor_id", UUID(as_uuid=True), ForeignKey("users.id")),
+    Column("student_id", UUID(as_uuid=True), ForeignKey("users.id")),
 )
 
 course_class_students = Table(
