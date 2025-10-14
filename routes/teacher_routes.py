@@ -9,7 +9,8 @@ from schemas.course_class_schema import (
     RemoveStudentSchema,
 )
 from schemas.user_schema import User
-from services import course_class_service
+from schemas.activity_schema import ActivityBase
+from services import course_class_service, activity_service
 from services.auth_service import require_role, require_teacher_class
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -95,3 +96,12 @@ async def remove_student(
 ):
     student_id = deps.validate_uuid(data.student_id)
     return await course_class_service.remove_student(course_class, student_id, db)
+
+
+@router.post("/my-classes/{course_class_id}/add-activity")
+async def add_activity(
+    activity: ActivityBase,
+    course_class: CourseClass = Depends(require_teacher_class()),
+    db: AsyncSession = Depends(deps.get_session),
+):
+    return await activity_service.create(db, activity, course_class.id)
