@@ -34,3 +34,6 @@ class CourseClassModel(Base):
     students = relationship(
         "UserModel", secondary=course_class_students, backref="course_class_students"
     )
+    activities = relationship(
+        "ActivityModel", back_populates="course_class", cascade="all, delete-orphan"
+    )
