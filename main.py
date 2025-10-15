@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from routes import auth_routes, teacher_routes, student_routes
+from routes import auth_routes, teacher_routes, student_routes, monitor_routes
 from fastapi.middleware.cors import CORSMiddleware
 from core.config import settings
 
@@ -8,6 +8,7 @@ app = FastAPI()
 app.include_router(auth_routes.router, tags=["auth"])
 app.include_router(teacher_routes.router, tags=["teacher"])
 app.include_router(student_routes.router, tags=["student"])
+app.include_router(monitor_routes.router, tags=["monitor"])
 
 origins = [settings.CORS_ORIGINS]
 

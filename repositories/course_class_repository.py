@@ -1,4 +1,8 @@
-from models.course_class_model import CourseClassModel, course_class_students
+from models.course_class_model import (
+    CourseClassModel,
+    course_class_students,
+    course_class_monitors,
+)
 from models.user_model import UserModel
 from schemas.course_class_schema import (
     CourseClass,
@@ -32,6 +36,35 @@ async def get_teacher_classes(
     limit: int = 10,
 ):
     query = select(CourseClassModel).where(CourseClassModel.teacher_id == teacher_id)
+
+    if name:
+        query = query.where(CourseClassModel.name.ilike(f"%{name}%"))
+
+    if discipline:
+        query = query.where(CourseClassModel.discipline.ilike(f"%{discipline}%"))
+
+    if status:
+        query = query.where(CourseClassModel.status == status)
+
+    result = await db.execute(query.offset(skip).limit(limit))
+    classes = result.scalars().all()
+    return classes
+
+
+async def get_monitor_classes(
+    db: AsyncSession,
+    student_id: str,
+    name=None,
+    discipline=None,
+    status=None,
+    skip: int = 0,
+    limit: int = 10,
+):
+    query = (
+        select(CourseClassModel)
+        .join(course_class_monitors)
+        .where(course_class_monitors.c.monitor_id == student_id)
+    )
 
     if name:
         query = query.where(CourseClassModel.name.ilike(f"%{name}%"))
@@ -90,7 +123,7 @@ async def get_class_by_id(db: AsyncSession, course_class_id: str):
     result = await db.execute(query)
     course_class = result.scalars().first()
 
-    return CourseClass.from_orm(course_class)
+    return course_class
 
 
 async def add_monitor(

@@ -74,6 +74,30 @@ async def get_student_classes(
         raise e
 
 
+async def get_monitor_classes(
+    db: AsyncSession, student_id: str, course_class_id: Optional[str] = None, **filters
+):
+    try:
+        if course_class_id is None:
+            return await course_class_repository.get_monitor_classes(
+                db, student_id, **filters
+            )
+        else:
+            course_class = await course_class_repository.get_class_by_id(
+                db, course_class_id
+            )
+
+            if course_class is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Turma não encontrada"
+                )
+
+            return course_class
+
+    except Exception as e:
+        raise e
+
+
 async def add_monitor(
     course_class: CourseClass,
     monitor_email: str,
@@ -94,7 +118,8 @@ async def add_monitor(
 
     try:
         return await course_class_repository.add_monitor(db, course_class, monitor)
-    except Exception:
+    except Exception as e:
+        print(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Erro interno do servidor",
