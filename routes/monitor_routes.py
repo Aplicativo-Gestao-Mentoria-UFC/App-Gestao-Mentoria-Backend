@@ -35,4 +35,4 @@ async def get_classes(
 async def get_monitor_class_by_id(
     course_class: CourseClass = Depends(require_monitor_class()),
 ):
-    return course_class
+    return CourseClass.from_orm(course_class)
