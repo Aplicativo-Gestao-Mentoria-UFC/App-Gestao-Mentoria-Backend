@@ -132,3 +132,28 @@ def require_student_class():
         return course_class
 
     return checker
+
+
+def require_monitor_class():
+    async def checker(
+        course_class_id: str,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(deps.get_session),
+    ):
+        course_class_uuid = deps.validate_uuid(course_class_id)
+        course_class = await get_class_by_id(db, course_class_uuid)
+
+        if not course_class:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Essa turma não existe"
+            )
+
+        if not current_user in course_class.monitor:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Você não é monitor dessa turma",
+            )
+
+        return course_class
+
+    return checker

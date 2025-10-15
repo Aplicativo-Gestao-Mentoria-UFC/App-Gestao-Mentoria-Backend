@@ -1,9 +1,10 @@
 from typing import Optional
 from fastapi import APIRouter, Depends
-from services.auth_service import require_role
+from services.auth_service import require_role, require_monitor_class
 from sqlalchemy.ext.asyncio import AsyncSession
 from core import deps
 from schemas.user_schema import User
+from schemas.course_class_schema import CourseClass
 from services import course_class_service
 
 router = APIRouter(prefix="/monitor", dependencies=[Depends(require_role("STUDENT"))])
@@ -28,3 +29,10 @@ async def get_classes(
         skip=skip,
         limit=limit,
     )
+
+
+@router.get("/my-classes/{course_class_id}")
+async def get_monitor_class_by_id(
+    course_class: CourseClass = Depends(require_monitor_class()),
+):
+    return course_class
