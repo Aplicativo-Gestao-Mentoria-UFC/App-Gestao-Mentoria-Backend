@@ -80,10 +80,13 @@ async def get_current_user(
 
 def require_role(required_role: UserRole):
     async def role_checker(current_user: User = Depends(get_current_user)):
-        if current_user.role != required_role:
+        required_role_value = (
+            required_role.value if isinstance(required_role, UserRole) else required_role
+        )
+        if current_user.role != required_role_value:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Você não tem permissão para acecessar essa rota",
+                detail="Você não tem permissão para acessar essa rota",
             )
         return current_user
 

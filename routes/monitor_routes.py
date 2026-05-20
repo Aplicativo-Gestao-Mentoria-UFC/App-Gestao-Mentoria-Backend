@@ -6,14 +6,17 @@ from core import deps
 from schemas.user_schema import User
 from schemas.course_class_schema import CourseClass
 from services import course_class_service
+from models.__all_models import UserRole
 
-router = APIRouter(prefix="/monitor", dependencies=[Depends(require_role("STUDENT"))])
+router = APIRouter(
+    prefix="/monitor", dependencies=[Depends(require_role(UserRole.student))]
+)
 
 
 @router.get("/my-classes")
 async def get_classes(
     db: AsyncSession = Depends(deps.get_session),
-    current_user: User = Depends(require_role("STUDENT")),
+    current_user: User = Depends(require_role(UserRole.student)),
     name: Optional[str] = None,
     discipline: Optional[str] = None,
     status: Optional[str] = None,
