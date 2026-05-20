@@ -44,6 +44,12 @@ async def get_classes(
                     status_code=status.HTTP_404_NOT_FOUND, detail="Turma não encontrada"
                 )
 
+            if course_class.teacher_id != teacher_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Você não tem permissão para acessar essa turma",
+                )
+
             return course_class
 
     except Exception as e:
