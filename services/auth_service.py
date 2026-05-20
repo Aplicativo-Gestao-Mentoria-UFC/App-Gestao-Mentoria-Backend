@@ -28,7 +28,7 @@ async def authenticate_user(db: AsyncSession, email: str, password: str):
 
 
 async def register_user(
-    db: AsyncSession, username: str, email: str, role: UserRole, password: str
+    db: AsyncSession, username: str, email: str, password: str
 ):
     exists_email = await get_user_by_email(db, email)
 
@@ -47,7 +47,9 @@ async def register_user(
         )
 
     hashed_password = get_password_hash(password)
-    return await create_user(db, username, email, role, hashed_password)
+    return await create_user(
+        db, username, email, UserRole.student.value, hashed_password
+    )
 
 
 async def get_current_user(

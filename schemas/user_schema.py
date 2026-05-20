@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr
 from models.__all_models import UserRole
 import uuid
 
@@ -9,7 +9,11 @@ class UserBase(BaseModel):
     role: UserRole
 
 
-class UserCreate(UserBase):
+class UserCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    username: str
+    email: EmailStr
     password: str
 
 
