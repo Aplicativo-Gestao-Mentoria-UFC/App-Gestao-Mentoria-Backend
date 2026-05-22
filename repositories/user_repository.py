@@ -26,6 +26,11 @@ async def create_user(
         username=username, email=email, role=role, hashed_password=hashed_password
     )
     db.add(user)
-    await db.commit()
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise   
+    
     await db.refresh(user)
-    return User.from_orm(user)
+    return User.model_validate(user)

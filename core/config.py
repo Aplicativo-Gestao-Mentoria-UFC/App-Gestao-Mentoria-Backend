@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
-        class_sensitive = True
+        case_sensitive = True
 
 
 settings = Settings()

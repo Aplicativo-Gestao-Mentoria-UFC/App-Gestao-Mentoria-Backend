@@ -2,6 +2,7 @@ from fastapi import HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, exceptions
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 from uuid import UUID
 from core.security import get_password_hash, verify_password
 from core.config import settings
@@ -36,7 +37,7 @@ async def register_user(
 
     if exists_email:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="Já existe um usuário com esse email!",
         )
 
@@ -44,14 +45,29 @@ async def register_user(
 
     if exists_username:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="Já existe um usuário com esse username!",
         )
 
     hashed_password = get_password_hash(password)
-    return await create_user(
-        db, username, email, UserRole.student.value, hashed_password
-    )
+
+    try:
+        return await create_user(
+            db,
+            username,
+            email,
+            UserRole.student.value,
+            hashed_password
+        )
+
+    except IntegrityError:
+        await db.rollback()
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email ou username já está em uso!",
+        )
+    
 
 
 async def get_current_user(
