@@ -132,7 +132,7 @@ def require_student_class():
                 status_code=status.HTTP_404_NOT_FOUND, detail="Essa turma não existe"
             )
 
-        if not current_user in course_class.students:
+        if not any(student.id == current_user.id for student in course_class.students):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Você não é aluno dessa turma",
@@ -157,7 +157,7 @@ def require_monitor_class():
                 status_code=status.HTTP_404_NOT_FOUND, detail="Essa turma não existe"
             )
 
-        if not current_user in course_class.monitor:
+        if not any(monitor.id == current_user.id for monitor in course_class.monitor):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Você não é monitor dessa turma",
