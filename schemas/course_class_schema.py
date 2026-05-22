@@ -21,9 +21,9 @@ class CourseClass(BaseModel):
     discipline: str
     teacher_id: uuid.UUID
     status: str
-    activities: Optional[List[Activity]] = []
-    monitor: Optional[List[User]] = []
-    students: Optional[List[User]] = []
+    activities: List[Activity] = Field(default_factory=list)
+    monitor: List[User] = Field(default_factory=list)
+    students: List[User] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
