@@ -2,6 +2,7 @@ import logging
 from typing import Optional
 
 from fastapi import HTTPException, status
+from models.user_model import UserRole
 from repositories import course_class_repository, user_repository
 from schemas.course_class_schema import (
     CourseClass,
@@ -96,11 +97,11 @@ async def add_monitor(
     db: AsyncSession,
 ):
     monitor = await user_repository.get_user_by_email(db, email=monitor_email)
-    if not monitor:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Não existe nenhum estudante com esse email",
-        )
+    if monitor.role != UserRole.student.value:
+       raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Apenas estudantes podem ser monitores",
+    )
 
     if monitor in course_class.monitor:
         raise HTTPException(
@@ -125,10 +126,10 @@ async def add_student(
 ):
     student = await user_repository.get_user_by_email(db, email=student_email)
 
-    if not student:
+    if student.role != UserRole.student.value:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Não existe nenhum estudante com esse email",
+            detail="Apenas estudantes podem ser monitores",
         )
 
     if student in course_class.students:
