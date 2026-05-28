@@ -19,7 +19,7 @@ router = APIRouter(prefix="/auth")
 
 @router.post("/register", response_model=User, status_code=status.HTTP_201_CREATED)
 async def register(user: UserCreate, db: AsyncSession = Depends(deps.get_session)):
-    return await register_user(db, user.username, user.email, user.password)
+    return await register_user(db, user.username, user.email, user.role, user.password)
 
 
 @router.post("/token")

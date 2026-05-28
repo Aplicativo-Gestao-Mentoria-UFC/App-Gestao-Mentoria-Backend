@@ -20,6 +20,25 @@ from models.__all_models import UserRole
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 
+def resolve_registration_role(email: str, requested_role: UserRole) -> str:
+    if requested_role == UserRole.student:
+        return UserRole.student.value
+
+    if requested_role == UserRole.teacher:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Cadastro de professor ainda depende de validação "
+                "por email institucional"
+            ),
+        )
+
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Tipo de usuário inválido",
+    )
+
+
 async def authenticate_user(db: AsyncSession, email: str, password: str):
     user = await get_user_by_email(db, email)
 
@@ -31,7 +50,7 @@ async def authenticate_user(db: AsyncSession, email: str, password: str):
 
 
 async def register_user(
-    db: AsyncSession, username: str, email: str, password: str
+    db: AsyncSession, username: str, email: str, role: UserRole, password: str
 ):
     exists_email = await get_user_by_email(db, email)
 
@@ -49,6 +68,7 @@ async def register_user(
             detail="Já existe um usuário com esse username!",
         )
 
+    user_role = resolve_registration_role(email, role)
     hashed_password = get_password_hash(password)
 
     try:
@@ -56,8 +76,8 @@ async def register_user(
             db,
             username,
             email,
-            UserRole.student.value,
-            hashed_password
+            user_role,
+            hashed_password,
         )
 
     except IntegrityError:
