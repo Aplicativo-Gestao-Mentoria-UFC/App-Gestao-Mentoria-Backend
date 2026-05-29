@@ -1,6 +1,5 @@
 import logging
 from typing import Optional
-
 from fastapi import HTTPException, status
 from models.user_model import UserRole
 from repositories import course_class_repository, user_repository
@@ -9,7 +8,7 @@ from schemas.course_class_schema import (
     CourseClassBase,
     CourseClassRegister,
 )
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession 
 
 logger = logging.getLogger(__name__)
 
