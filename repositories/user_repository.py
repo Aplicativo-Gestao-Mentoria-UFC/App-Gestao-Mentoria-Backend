@@ -1,11 +1,13 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.exc import SQLAlchemyError
+
 from models.__all_models import UserModel, UserRole
 from schemas.user_schema import User
 
 
-async def get_user_by_id(db: AsyncSession, id):
-    result = await db.execute(select(UserModel).filter_by(id=id))
+async def get_user_by_id(db: AsyncSession, user_id: int):
+    result = await db.execute(select(UserModel).filter_by(id=user_id))
     return result.scalars().first()
 
 
@@ -20,12 +22,26 @@ async def get_user_by_email(db: AsyncSession, email: str):
 
 
 async def create_user(
-    db: AsyncSession, username: str, email: str, role: UserRole, hashed_password: str
+    db: AsyncSession,
+    username: str,
+    email: str,
+    role: UserRole,
+    hashed_password: str,
 ):
     user = UserModel(
-        username=username, email=email, role=role, hashed_password=hashed_password
+        username=username,
+        email=email,
+        role=role,
+        hashed_password=hashed_password,
     )
+
     db.add(user)
-    await db.commit()
-    await db.refresh(user)
-    return User.from_orm(user)
+
+    try:
+        await db.commit()
+        await db.refresh(user)
+        return User.model_validate(user)
+
+    except SQLAlchemyError:
+        await db.rollback()
+        raise

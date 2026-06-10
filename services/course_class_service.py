@@ -1,13 +1,16 @@
+import logging
 from typing import Optional
-
 from fastapi import HTTPException, status
+from models.user_model import UserRole
 from repositories import course_class_repository, user_repository
 from schemas.course_class_schema import (
     CourseClass,
     CourseClassBase,
     CourseClassRegister,
 )
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession 
+
+logger = logging.getLogger(__name__)
 
 
 async def create(db: AsyncSession, course_class: CourseClassBase, teacher_id: str):
@@ -20,6 +23,7 @@ async def create(db: AsyncSession, course_class: CourseClassBase, teacher_id: st
     try:
         return await course_class_repository.create(db, course_class_register)
     except Exception:
+        logger.exception("Erro ao criar turma")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Erro interno do servidor",
@@ -29,73 +33,61 @@ async def create(db: AsyncSession, course_class: CourseClassBase, teacher_id: st
 async def get_classes(
     db: AsyncSession, teacher_id: str, course_class_id: Optional[str] = None, **filters
 ):
-    try:
-        if course_class_id is None:
-            return await course_class_repository.get_teacher_classes(
-                db, teacher_id, **filters
-            )
-        else:
-            course_class = await course_class_repository.get_class_by_id(
-                db, course_class_id
-            )
+    if course_class_id is None:
+        return await course_class_repository.get_teacher_classes(
+            db, teacher_id, **filters
+        )
 
-            if course_class is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, detail="Turma não encontrada"
-                )
+    course_class = await course_class_repository.get_class_by_id(db, course_class_id)
 
-            return course_class
+    if course_class is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Turma não encontrada"
+        )
 
-    except Exception as e:
-        raise e
+    if course_class.teacher_id != teacher_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Você não tem permissão para acessar essa turma",
+        )
+
+    return course_class
 
 
 async def get_student_classes(
     db: AsyncSession, student_id: str, course_class_id: Optional[str] = None, **filters
 ):
-    try:
-        if course_class_id is None:
-            return await course_class_repository.get_student_classes(
-                db, student_id, **filters
-            )
-        else:
-            course_class = await course_class_repository.get_class_by_id(
-                db, course_class_id
-            )
+    if course_class_id is None:
+        return await course_class_repository.get_student_classes(
+            db, student_id, **filters
+        )
 
-            if course_class is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, detail="Turma não encontrada"
-                )
+    course_class = await course_class_repository.get_class_by_id(db, course_class_id)
 
-            return course_class
+    if course_class is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Turma não encontrada"
+        )
 
-    except Exception as e:
-        raise e
+    return course_class
 
 
 async def get_monitor_classes(
     db: AsyncSession, student_id: str, course_class_id: Optional[str] = None, **filters
 ):
-    try:
-        if course_class_id is None:
-            return await course_class_repository.get_monitor_classes(
-                db, student_id, **filters
-            )
-        else:
-            course_class = await course_class_repository.get_class_by_id(
-                db, course_class_id
-            )
+    if course_class_id is None:
+        return await course_class_repository.get_monitor_classes(
+            db, student_id, **filters
+        )
 
-            if course_class is None:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND, detail="Turma não encontrada"
-                )
+    course_class = await course_class_repository.get_class_by_id(db, course_class_id)
 
-            return course_class
+    if course_class is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Turma não encontrada"
+        )
 
-    except Exception as e:
-        raise e
+    return course_class
 
 
 async def add_monitor(
@@ -104,11 +96,11 @@ async def add_monitor(
     db: AsyncSession,
 ):
     monitor = await user_repository.get_user_by_email(db, email=monitor_email)
-    if not monitor:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Não existe nenhum estudante com esse email",
-        )
+    if monitor.role != UserRole.student.value:
+       raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Apenas estudantes podem ser monitores",
+    )
 
     if monitor in course_class.monitor:
         raise HTTPException(
@@ -118,8 +110,8 @@ async def add_monitor(
 
     try:
         return await course_class_repository.add_monitor(db, course_class, monitor)
-    except Exception as e:
-        print(e)
+    except Exception:
+        logger.exception("Erro ao adicionar monitor na turma")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Erro interno do servidor",
@@ -133,10 +125,10 @@ async def add_student(
 ):
     student = await user_repository.get_user_by_email(db, email=student_email)
 
-    if not student:
+    if student.role != UserRole.student.value:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Não existe nenhum estudante com esse email",
+            detail="Apenas estudantes podem ser monitores",
         )
 
     if student in course_class.students:
@@ -148,6 +140,7 @@ async def add_student(
     try:
         return await course_class_repository.add_student(db, course_class, student)
     except Exception:
+        logger.exception("Erro ao adicionar aluno na turma")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Erro interno do servidor",
@@ -170,6 +163,7 @@ async def remove_monitor(
     try:
         return await course_class_repository.remove_monitor(db, course_class, monitor)
     except Exception:
+        logger.exception("Erro ao remover monitor da turma")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Erro interno do servidor",
@@ -192,6 +186,7 @@ async def remove_student(
     try:
         return await course_class_repository.remove_student(db, course_class, student)
     except Exception:
+        logger.exception("Erro ao remover aluno da turma")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Erro interno do servidor",

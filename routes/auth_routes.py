@@ -8,18 +8,16 @@ from services.auth_service import (
     authenticate_user,
     get_current_user,
     register_user,
-    require_role,
 )
 from core import deps
 from core.config import settings
 from core.security import create_access_token
-from models.__all_models import UserRole
 
 
 router = APIRouter(prefix="/auth")
 
 
-@router.post("/register")
+@router.post("/register", response_model=User, status_code=status.HTTP_201_CREATED)
 async def register(user: UserCreate, db: AsyncSession = Depends(deps.get_session)):
     return await register_user(db, user.username, user.email, user.role, user.password)
 
@@ -38,7 +36,8 @@ async def login_for_access_token(
         )
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.email}, expires_delta=access_token_expires
+        data={"sub": str(user.id), "type": "access"},
+        expires_delta=access_token_expires,
     )
     return Token(access_token=access_token, token_type="bearer")
 

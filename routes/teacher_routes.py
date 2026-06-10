@@ -13,15 +13,18 @@ from schemas.activity_schema import ActivityBase
 from services import course_class_service, activity_service
 from services.auth_service import require_role, require_teacher_class
 from sqlalchemy.ext.asyncio import AsyncSession
+from models.__all_models import UserRole
 
-router = APIRouter(prefix="/teacher", dependencies=[Depends(require_role("TEACHER"))])
+router = APIRouter(
+    prefix="/teacher", dependencies=[Depends(require_role(UserRole.teacher))]
+)
 
 
 @router.post("/register-class")
 async def register_class(
     course_class: CourseClassBase,
     db: AsyncSession = Depends(deps.get_session),
-    current_user: User = Depends(require_role("TEACHER")),
+    current_user: User = Depends(require_role(UserRole.teacher)),
 ):
     return await course_class_service.create(db, course_class, current_user.id)
 
@@ -29,7 +32,7 @@ async def register_class(
 @router.get("/my-classes")
 async def get_classes(
     db: AsyncSession = Depends(deps.get_session),
-    current_user: User = Depends(require_role("TEACHER")),
+    current_user: User = Depends(require_role(UserRole.teacher)),
     name: Optional[str] = None,
     discipline: Optional[str] = None,
     status: Optional[str] = None,
@@ -51,7 +54,7 @@ async def get_classes(
 async def get_teacher_class_by_id(
     course_class_id: str,
     db: AsyncSession = Depends(deps.get_session),
-    current_user: User = Depends(require_role("TEACHER")),
+    current_user: User = Depends(require_role(UserRole.teacher)),
 ):
     return await course_class_service.get_classes(db, current_user.id, course_class_id)
 
