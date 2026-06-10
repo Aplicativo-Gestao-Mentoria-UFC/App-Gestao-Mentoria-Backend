@@ -14,7 +14,11 @@ from repositories.user_repository import (
     create_user,
 )
 from repositories.course_class_repository import get_class_by_id
-from schemas.user_schema import User
+from schemas.user_schema import (
+    User,
+    validate_strong_password,
+    validate_teacher_institutional_email,
+)
 from models.__all_models import UserRole
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
@@ -25,13 +29,7 @@ def resolve_registration_role(email: str, requested_role: UserRole) -> str:
         return UserRole.student.value
 
     if requested_role == UserRole.teacher:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Cadastro de professor ainda depende de validação "
-                "por email institucional"
-            ),
-        )
+        return UserRole.teacher.value
 
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
@@ -52,6 +50,15 @@ async def authenticate_user(db: AsyncSession, email: str, password: str):
 async def register_user(
     db: AsyncSession, username: str, email: str, role: UserRole, password: str
 ):
+    try:
+        email = validate_teacher_institutional_email(email, role)
+        password = validate_strong_password(password)
+    except ValueError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(error),
+        )
+
     exists_email = await get_user_by_email(db, email)
 
     if exists_email:
