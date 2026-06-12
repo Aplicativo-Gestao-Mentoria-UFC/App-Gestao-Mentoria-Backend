@@ -157,3 +157,4 @@ def require_monitor_class():
         return course_class
 
     return checker
+

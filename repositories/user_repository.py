@@ -29,3 +29,15 @@ async def create_user(
     await db.commit()
     await db.refresh(user)
     return User.from_orm(user)
+
+async def update_user_password(
+    db: AsyncSession,
+    user: UserModel,
+    hashed_password: str,
+):
+    setattr(user, "hashed_password", hashed_password)
+
+    await db.commit()
+    await db.refresh(user)
+
+    return user

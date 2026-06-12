@@ -1,5 +1,17 @@
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from schemas.password_reset_schema import (
+    ForgotPasswordRequest,
+    VerifyResetCodeRequest,
+    ResetPasswordRequest,
+    ResetCodeVerifiedResponse,
+)
+
+from services.password_reset_service import (
+    request_password_reset,
+    verify_password_reset_code,
+    reset_password_with_token,
+)
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from schemas.user_schema import UserCreate, User
@@ -46,3 +58,39 @@ async def login_for_access_token(
 @router.get("/me", response_model=User)
 async def read_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+@router.post("/forgot-password")
+async def forgot_password(
+    data: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(deps.get_session),
+):
+    return await request_password_reset(
+        db=db,
+        email=data.email,
+        background_tasks=background_tasks,
+    )
+
+
+@router.post("/verify-reset-code", response_model=ResetCodeVerifiedResponse)
+async def verify_reset_code(
+    data: VerifyResetCodeRequest,
+    db: AsyncSession = Depends(deps.get_session),
+):
+    return await verify_password_reset_code(
+        db=db,
+        email=data.email,
+        code=data.code,
+    )
+
+
+@router.post("/reset-password", response_model=Token)
+async def reset_password(
+    data: ResetPasswordRequest,
+    db: AsyncSession = Depends(deps.get_session),
+):
+    return await reset_password_with_token(
+        db=db,
+        reset_token=data.reset_token,
+        new_password=data.new_password,
+    )
