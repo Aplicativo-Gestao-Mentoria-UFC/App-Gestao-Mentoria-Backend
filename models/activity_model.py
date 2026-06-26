@@ -1,4 +1,5 @@
 import uuid
+
 from sqlalchemy import UUID, Column, ForeignKey, String
 from sqlalchemy.orm import relationship
 
@@ -9,11 +10,23 @@ class ActivityModel(Base):
     __tablename__ = "activities"
 
     id = Column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        nullable=False,
     )
+
     title = Column(String, nullable=False)
     description = Column(String, nullable=False)
     fileUrl = Column(String, nullable=True)
-    course_class_id = Column(UUID(as_uuid=True), ForeignKey("course_class.id"))
 
-    course_class = relationship("CourseClassModel", back_populates="activities")
+    course_class_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("course_class.id"),
+        nullable=False,
+    )
+
+    course_class = relationship(
+        "CourseClassModel",
+        back_populates="activities",
+    )

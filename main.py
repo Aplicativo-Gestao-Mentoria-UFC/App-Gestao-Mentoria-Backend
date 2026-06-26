@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from routes import auth_routes, teacher_routes, student_routes, monitor_routes, activity_routes
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
