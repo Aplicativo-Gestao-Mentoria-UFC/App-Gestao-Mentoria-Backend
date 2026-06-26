@@ -1,14 +1,14 @@
 from typing import List, Optional
 import uuid
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from schemas.user_schema import User
 from schemas.activity_schema import Activity
 
 
 class CourseClassBase(BaseModel):
-    name: str
-    discipline: str
+    name: str = Field(min_length=1, max_length=100)
+    discipline: str = Field(min_length=1, max_length=100)
 
 
 class CourseClassRegister(CourseClassBase):
@@ -21,17 +21,21 @@ class CourseClass(BaseModel):
     discipline: str
     teacher_id: uuid.UUID
     status: str
-    activities: Optional[List[Activity]] = []
-    monitor: Optional[List[User]] = []
-    students: Optional[List[User]] = []
+    activities: List[Activity] = Field(default_factory=list)
+    monitor: List[User] = Field(default_factory=list)
+    students: List[User] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
 
 
 class AddStudentSchema(BaseModel):
-    email: str
+    model_config = ConfigDict(extra="forbid")
+
+    email: EmailStr
 
 
 class RemoveStudentSchema(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     student_id: str

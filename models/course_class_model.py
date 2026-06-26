@@ -1,20 +1,40 @@
 import uuid
-from sqlalchemy import UUID, Column, ForeignKey, String, Table, true
+from sqlalchemy import UUID, Column, ForeignKey, String, Table
 from core.database import Base
 from sqlalchemy.orm import relationship
 
 course_class_monitors = Table(
     "course_class_monitors",
     Base.metadata,
-    Column("course_class_id", UUID(as_uuid=True), ForeignKey("course_class.id")),
-    Column("monitor_id", UUID(as_uuid=True), ForeignKey("users.id")),
+    Column(
+        "course_class_id",
+        UUID(as_uuid=True),
+        ForeignKey("course_class.id"),
+        primary_key=True,
+    ),
+    Column(
+        "monitor_id",
+        UUID(as_uuid=True),
+        ForeignKey("users.id"),
+        primary_key=True,
+    ),
 )
 
 course_class_students = Table(
     "course_class_students",
     Base.metadata,
-    Column("course_class_id", UUID(as_uuid=True), ForeignKey("course_class.id")),
-    Column("student_id", UUID(as_uuid=True), ForeignKey("users.id")),
+    Column(
+        "course_class_id",
+        UUID(as_uuid=True),
+        ForeignKey("course_class.id"),
+        primary_key=True,
+    ),
+    Column(
+        "student_id",
+        UUID(as_uuid=True),
+        ForeignKey("users.id"),
+        primary_key=True,
+    ),
 )
 
 
