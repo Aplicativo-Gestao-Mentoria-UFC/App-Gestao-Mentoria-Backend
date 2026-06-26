@@ -11,6 +11,9 @@ venv/
 pip-log.txt
 pip-delete-this-arg.txt
 
+*.md
+*.json
+
 # Editor/IDE specific
 .idea/
 .vscode/

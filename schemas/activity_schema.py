@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel
 import uuid
 
@@ -5,6 +7,7 @@ import uuid
 class ActivityBase(BaseModel):
     title: str
     description: str
+    fileUrl: Optional[str] = None
 
 
 class ActivityRegister(ActivityBase):

@@ -13,6 +13,7 @@ class ActivityModel(Base):
     )
     title = Column(String, nullable=False)
     description = Column(String, nullable=False)
+    fileUrl = Column(String, nullable=True)
     course_class_id = Column(UUID(as_uuid=True), ForeignKey("course_class.id"))
 
     course_class = relationship("CourseClassModel", back_populates="activities")

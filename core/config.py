@@ -19,8 +19,11 @@ class Settings(BaseSettings):
     MAIL_PASSWORD: str
     MAIL_FROM: str
     MAIL_FROM_NAME: str = "Sistema de Monitoria"
+    
 
     FRONTEND_URL: str = "http://localhost:3000"
+
+    LOGO_URL: str = "https://cdn-icons-png.flaticon.com/512/11305/11305888.png"
 
     class Config:
         env_file = ".env"

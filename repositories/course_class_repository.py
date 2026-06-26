@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from models.course_class_model import (
     CourseClassModel,
     course_class_students,
@@ -28,7 +30,7 @@ async def create(db: AsyncSession, course_class_register: CourseClassRegister):
 
 async def get_teacher_classes(
     db: AsyncSession,
-    teacher_id: str,
+    teacher_id: UUID,
     name=None,
     discipline=None,
     status=None,
@@ -53,7 +55,7 @@ async def get_teacher_classes(
 
 async def get_monitor_classes(
     db: AsyncSession,
-    student_id: str,
+    student_id: UUID,
     name=None,
     discipline=None,
     status=None,
@@ -82,7 +84,7 @@ async def get_monitor_classes(
 
 async def get_student_classes(
     db: AsyncSession,
-    student_id: str,
+    student_id: UUID,
     name=None,
     discipline=None,
     status=None,
@@ -109,7 +111,7 @@ async def get_student_classes(
     return classes
 
 
-async def get_class_by_id(db: AsyncSession, course_class_id: str):
+async def get_class_by_id(db: AsyncSession, course_class_id: UUID):
     query = (
         select(CourseClassModel)
         .options(

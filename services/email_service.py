@@ -4,39 +4,58 @@ import aiosmtplib
 from core.config import settings
 
 async def send_email(to_email: str, subject: str, content: str):
-    message = EmailMessage()
-    message["From"] = f"{settings.MAIL_FROM_NAME} <{settings.MAIL_FROM}>"
-    message["To"] = to_email
-    message["Subject"] = subject
-    message.set_content(content)
+        message = EmailMessage()
+        message["From"] = f"{settings.MAIL_FROM_NAME} <{settings.MAIL_FROM}>"
+        message["To"] = to_email
+        message["Subject"] = subject
+        message.set_content(content)
 
-    await aiosmtplib.send(
-        message,
-        hostname=settings.MAIL_HOST,
-        port=settings.MAIL_PORT,
-        username=settings.MAIL_USERNAME,
-        password=settings.MAIL_PASSWORD,
-        start_tls=True,
-        validate_certs=False,
-    )
+        await aiosmtplib.send(
+            message,
+            hostname=settings.MAIL_HOST,
+            port=settings.MAIL_PORT,
+            username=settings.MAIL_USERNAME,
+            password=settings.MAIL_PASSWORD,
+            start_tls=True,
+            validate_certs=False,
+        )
 
-async def send_password_reset_code(to_email: str, code: str):
-    content = f"""
-Olá!
+async def send_password_reset_code(to_email: str, code: str, name: str):
+        html_content = render_template(
+            "password_reset.html",
+            nome=name,
+            codigo_formatado=code,
+            tempo_expiracao="30 minutos",
+            logo_url=settings.LOGO_URL
+        )
 
-Recebemos uma solicitação para redefinir sua senha.
+        await send_email(
+            to_email=to_email,
+            subject="Código de recuperação de senha",
+            content=html_content,
+        )
 
-Seu código de recuperação é:
 
-{code}
+async def send_confirmation_code(
+        to_email: str, code: str, confirmation_type: str = "email_verification"
+    ):
+        type_labels = {
+            "email_verification": "Confirmação de Email",
+            "activity_confirmation": "Confirmação de Atividade",
+        }
 
-Esse código expira em 30 minutos e só pode ser usado uma vez.
+        type_label = type_labels.get(confirmation_type, "Confirmação")
 
-Se você não solicitou essa recuperação, ignore este email.
-"""
+        html_content = render_template(
+            "sign_up_confirm.html",
+            nome="Usuário",
+            codigo_formatado=code,
+            tempo_expiracao="30 minutos",
+            logo_url=settings.LOGO_URL
+        )
 
-    await send_email(
-        to_email=to_email,
-        subject="Código de recuperação de senha",
-        content=content,
-    )
+        await send_email(
+            to_email=to_email,
+            subject=f"Código de {type_label}",
+            content=html_content,
+        )

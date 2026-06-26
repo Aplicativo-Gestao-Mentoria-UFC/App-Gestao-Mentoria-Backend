@@ -6,11 +6,20 @@ from schemas.password_reset_schema import (
     ResetPasswordRequest,
     ResetCodeVerifiedResponse,
 )
+from schemas.confirmation_schema import (
+    RequestConfirmationCodeRequest,
+    VerifyConfirmationCodeRequest,
+    ConfirmationCodeVerifiedResponse,
+)
 
 from services.password_reset_service import (
     request_password_reset,
     verify_password_reset_code,
     reset_password_with_token,
+)
+from services.confirmation_service import (
+    request_confirmation_code,
+    verify_confirmation_code,
 )
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -93,4 +102,30 @@ async def reset_password(
         db=db,
         reset_token=data.reset_token,
         new_password=data.new_password,
+    )
+
+
+@router.post("/request-confirmation-code")
+async def request_confirmation(
+    data: RequestConfirmationCodeRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(deps.get_session),
+):
+    return await request_confirmation_code(
+        db=db,
+        email=data.email,
+        background_tasks=background_tasks,
+    )
+
+
+@router.post("/verify-confirmation-code", response_model=ConfirmationCodeVerifiedResponse)
+async def verify_confirmation(
+    data: VerifyConfirmationCodeRequest,
+    db: AsyncSession = Depends(deps.get_session),
+):
+    return await verify_confirmation_code(
+        db=db,
+        email=data.email,
+        code=data.code,
+        confirmation_type=data.confirmation_type,
     )
