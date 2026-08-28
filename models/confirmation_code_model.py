@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
@@ -24,11 +24,11 @@ class ConfirmationCodeModel(Base):
 
     confirmation_type = Column(String, default="email_verification", nullable=False)
 
-    expires_at = Column(DateTime, nullable=False)
-    confirmed_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    confirmed_at = Column(DateTime(timezone=True), nullable=True)
 
     attempts = Column(Integer, default=0, nullable=False)
 
-    created_at = Column(DateTime, default=datetime.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
 
     user = relationship("UserModel")

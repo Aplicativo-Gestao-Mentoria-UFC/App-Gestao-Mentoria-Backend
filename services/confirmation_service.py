@@ -1,15 +1,17 @@
 import hashlib
 import hmac
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC, timezone
 
 from fastapi import BackgroundTasks, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
+from repositories import user_repository
 from repositories.user_repository import get_user_by_email
 from repositories import confirmation_code_repository
 from services.email_service import send_confirmation_code
+from usr.user_repository import mark_email_as_verified
 
 
 CONFIRMATION_CODE_EXPIRE_MINUTES = 30
@@ -20,8 +22,8 @@ def generate_six_digit_code() -> str:
     return f"{secrets.randbelow(1_000_000):06d}"
 
 
-def hash_confirmation_code(user_id, code: str) -> str:
-    payload = f"{user_id}:{code}".encode("utf-8")
+def hash_confirmation_code(user_id, code: str, confirmation_type: str) -> str:
+    payload = f"{user_id}:{confirmation_type}:{code}".encode("utf-8")
     secret = settings.JWT_SECRET.encode("utf-8")
 
     return hmac.new(secret, payload, hashlib.sha256).hexdigest()
@@ -51,9 +53,9 @@ async def request_confirmation_code(
         return generic_response
 
     raw_code = generate_six_digit_code()
-    code_hash = hash_confirmation_code(user.id, raw_code)
+    code_hash = hash_confirmation_code(user.id, raw_code, confirmation_type)
 
-    expires_at = datetime.utcnow() + timedelta(
+    expires_at = datetime.now(timezone.utc) + timedelta(
         minutes=CONFIRMATION_CODE_EXPIRE_MINUTES
     )
 
@@ -115,7 +117,7 @@ async def verify_confirmation_code(
             detail="Muitas tentativas. Solicite um novo código.",
         )
 
-    code_hash = hash_confirmation_code(user.id, code)
+    code_hash = hash_confirmation_code(user.id, code, confirmation_type)
 
     if not hmac.compare_digest(code_hash, confirmation_code.code_hash):
         confirmation_code.attempts += 1
@@ -125,10 +127,20 @@ async def verify_confirmation_code(
             detail="Código inválido ou expirado.",
         )
 
-    await confirmation_code_repository.mark_as_confirmed(
-        db=db,
-        confirmation_code_id=confirmation_code.id,
-    )
+    try: 
+        await confirmation_code_repository.mark_as_confirmed(
+            db=db,
+            confirmation_code_id=confirmation_code.id,
+            commit=False
+        )
+
+        await mark_email_as_verified(db=db, user_id=user.id, commit=False)
+
+        await db.commit()
+
+    except Exception:
+        await db.rollback()
+        raise 
 
     return {
         "message": f"Confirmação de {confirmation_type} realizada com sucesso!",

@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, UUID, String
+from sqlalchemy import Column, UUID, DateTime, String
 from core.database import Base
 from enum import Enum
 
@@ -19,3 +19,4 @@ class UserModel(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     role = Column(String, default=UserRole.student.value)
     hashed_password = Column(String, nullable=False)
+    email_verified_at = Column(DateTime(timezone=True), nullable=True, default=None)

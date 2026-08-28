@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime, timezone
 import uuid
 
 from sqlalchemy import select
@@ -35,7 +35,7 @@ async def get_latest_active_code_by_user_id(
     stmt = select(ConfirmationCodeModel).where(
         (ConfirmationCodeModel.user_id == user_id)
         & (ConfirmationCodeModel.confirmation_type == confirmation_type)
-        & (ConfirmationCodeModel.expires_at > datetime.utcnow())
+        & (ConfirmationCodeModel.expires_at > datetime.now(timezone.utc))
         & (ConfirmationCodeModel.confirmed_at.is_(None))
     )
 
@@ -58,7 +58,7 @@ async def invalidate_active_codes(
     codes = result.scalars().all()
 
     for code in codes:
-        code.expires_at = datetime.utcnow()
+        code.expires_at = datetime.now(timezone.utc)
 
     await db.commit()
 
@@ -66,10 +66,20 @@ async def invalidate_active_codes(
 async def mark_as_confirmed(
     db: AsyncSession,
     confirmation_code_id: uuid.UUID,
+    commit: bool = True,
 ):
     code = await db.get(ConfirmationCodeModel, confirmation_code_id)
-    if code:
-        code.confirmed_at = datetime.utcnow()
+
+    if not code:
+        return None
+    
+    code.confirmed_at = datetime.now(timezone.utc)
+
+    if(commit):
         await db.commit()
         await db.refresh(code)
+
+    else:
+        await db.flush()
+
     return code

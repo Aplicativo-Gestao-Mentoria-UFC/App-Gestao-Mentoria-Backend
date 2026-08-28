@@ -1,3 +1,4 @@
+from datetime import datetime
 import re
 from typing import Optional
 
@@ -20,6 +21,10 @@ WEAK_PASSWORD_MESSAGE = (
 TEACHER_EMAIL_DOMAIN = "ufc.br"
 INVALID_TEACHER_EMAIL_MESSAGE = (
     "Professores devem usar email institucional com domínio @ufc.br."
+)
+
+INVALID_STUDENT_EMAIL_MESSAGE = (
+    "Emails @ufc.br devem ser cadastrados como professor."
 )
 
 
@@ -51,6 +56,12 @@ def validate_teacher_institutional_email(email: EmailStr | str, role: UserRole) 
         and get_email_domain(email_value) != TEACHER_EMAIL_DOMAIN
     ):
         raise ValueError(INVALID_TEACHER_EMAIL_MESSAGE)
+
+    if(
+        role == UserRole.student
+        and get_email_domain(email_value) == TEACHER_EMAIL_DOMAIN
+    ):
+        raise ValueError(INVALID_STUDENT_EMAIL_MESSAGE)
 
     return email_value
 
@@ -90,7 +101,6 @@ class UserUpdate(BaseModel):
 
     username: Optional[str] = Field(default=None, min_length=3, max_length=50)
     email: Optional[EmailStr] = None
-    role: Optional[UserRole] = None
     password: Optional[str] = Field(default=None, max_length=128)
 
     @model_validator(mode="after")
@@ -114,6 +124,7 @@ class User(BaseModel):
     username: str
     email: EmailStr
     role: UserRole
+    email_verified_at: datetime | None
 
     class Config:
         from_attributes = True

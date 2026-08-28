@@ -8,8 +8,6 @@ class RequestConfirmationCodeRequest(BaseModel):
 class VerifyConfirmationCodeRequest(BaseModel):
     email: EmailStr
     code: str
-    confirmation_type: str = "email_verification"
-
 
 class ConfirmationCodeVerifiedResponse(BaseModel):
     message: str
