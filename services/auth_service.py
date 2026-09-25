@@ -1,93 +1,79 @@
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
-
-from fastapi import BackgroundTasks, HTTPException, Depends, status
-from fastapi.security import OAuth2PasswordBearer
-from jose import jwt, exceptions
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.exc import IntegrityError
-
-import hmac
 import hashlib
+import hmac
 import secrets
 
-from core.security import create_access_token, get_password_hash, verify_password
-from core.config import settings
-from core import deps
+from fastapi import BackgroundTasks, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import exceptions, jwt
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from core import deps
+from core.config import settings
+from core.security import create_access_token, get_password_hash, verify_password
+from models.__all_models import UserRole
+from models.user_model import UserModel
 from repositories import professor_signup_repository
+from repositories.activity_repository import get_by_id as get_activity_by_id
+from repositories.course_class_repository import (
+    get_class_by_id,
+    has_class_read_permission,
+    has_class_write_permission,
+    is_monitor_of_class,
+    is_student_of_class,
+    is_teacher_of_class,
+)
 from repositories.user_repository import (
+    create_user,
     create_verified_teacher,
     get_user_by_email,
     get_user_by_id,
     get_user_by_username,
-    create_user,
 )
-
-from repositories.course_class_repository import (
-    get_class_by_id,
-    is_teacher_of_class,
-    is_student_of_class,
-    is_monitor_of_class,
-    has_class_write_permission,
-    has_class_read_permission,
-)
-
-from repositories.activity_repository import get_by_id as get_activity_by_id
-
-from schemas.user_schema import (
-    validate_strong_password,
-    validate_teacher_institutional_email,
-)
-
-from models.user_model import UserModel
-from models.__all_models import UserRole
-from services.email_service import send_confirmation_code
+from schemas.user_schema import validate_strong_password, validate_teacher_institutional_email
+from services.email_service import safe_send_confirmation_code
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
-
-PROFESSOR_SIGNUP_CODE_EXPIRE_MINUTES = 30
-PROFESSOR_SIGNUP_TOKEN_EXPIRE_MINUTES = 30
-
-PROFESSOR_SIGNUP_MAX_ATTEMPTS = 5
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 
-def resolve_registration_role(
-    email: str,
-    requested_role: UserRole,
-) -> str:
+def resolve_registration_role(requested_role: UserRole) -> str:
     if requested_role == UserRole.student:
         return UserRole.student.value
-
     if requested_role == UserRole.teacher:
         return UserRole.teacher.value
-
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail="Tipo de usuário inválido",
     )
 
+
 def generate_professor_signup_code() -> str:
     return f"{secrets.randbelow(1_000_000):06d}"
 
-def hash_professor_signup_code(
-    email: str,
-    code: str,
-) -> str:
+
+def hash_professor_signup_code(email: str, code: str) -> str:
     normalized_email = email.strip().lower()
-
-    payload = (
-        f"professor_signup:{normalized_email}:{code}"
-    ).encode("utf-8")
-
-    secret = settings.JWT_SECRET.encode("utf-8")
-
+    payload = f"professor_signup:{normalized_email}:{code}".encode("utf-8")
     return hmac.new(
-        secret,
+        settings.JWT_SECRET.encode("utf-8"),
         payload,
         hashlib.sha256,
     ).hexdigest()
+
+
+def create_professor_signup_token(email: str, verification_id: UUID) -> str:
+    return create_access_token(
+        data={
+            "sub": email.strip().lower(),
+            "type": "professor_signup",
+            "verification_id": str(verification_id),
+        },
+        expires_delta=timedelta(minutes=settings.PROFESSOR_SIGNUP_TOKEN_EXPIRE_MINUTES),
+    )
+
 
 async def request_professor_signup_code(
     db: AsyncSession,
@@ -97,42 +83,33 @@ async def request_professor_signup_code(
     normalized_email = email.strip().lower()
 
     try:
-        normalized_email = (
-            validate_teacher_institutional_email(
-                normalized_email,
-                UserRole.teacher,
-            )
+        normalized_email = validate_teacher_institutional_email(
+            normalized_email,
+            UserRole.teacher,
         )
-
     except ValueError as error:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(error),
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 
-    existing_user = await get_user_by_email(
-        db,
-        normalized_email,
-    )
-
+    existing_user = await get_user_by_email(db, normalized_email)
     if existing_user is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Já existe uma conta cadastrada com esse email.",
         )
 
-    raw_code = generate_professor_signup_code()
-
-    code_hash = hash_professor_signup_code(
-        normalized_email,
-        raw_code,
-    )
-
-    expires_at = (
-        datetime.now(UTC)
-        + timedelta(
-            minutes=PROFESSOR_SIGNUP_CODE_EXPIRE_MINUTES
+    if await professor_signup_repository.has_completed_signup_for_email(
+        db=db,
+        email=normalized_email,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Este email institucional já foi utilizado em um cadastro concluído.",
         )
+
+    raw_code = generate_professor_signup_code()
+    code_hash = hash_professor_signup_code(normalized_email, raw_code)
+    expires_at = datetime.now(UTC) + timedelta(
+        minutes=settings.PROFESSOR_SIGNUP_CODE_EXPIRE_MINUTES
     )
 
     try:
@@ -140,30 +117,25 @@ async def request_professor_signup_code(
             db=db,
             email=normalized_email,
         )
-
         await professor_signup_repository.create(
             db=db,
             email=normalized_email,
             code_hash=code_hash,
             expires_at=expires_at,
         )
-
         await db.commit()
-
     except Exception:
         await db.rollback()
         raise
 
     background_tasks.add_task(
-        send_confirmation_code,
+        safe_send_confirmation_code,
         normalized_email,
         raw_code,
         "professor_signup",
     )
+    return {"message": "Código enviado para o email institucional."}
 
-    return {
-        "message": "Código enviado para o email institucional."
-    }
 
 async def verify_professor_signup_code(
     db: AsyncSession,
@@ -178,48 +150,29 @@ async def verify_professor_signup_code(
             detail="Código inválido ou expirado.",
         )
 
-    verification = (
-        await professor_signup_repository
-        .get_latest_active_by_email(
-            db=db,
-            email=normalized_email,
-        )
+    verification = await professor_signup_repository.get_latest_active_by_email(
+        db=db,
+        email=normalized_email,
     )
-
     if verification is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Código inválido, expirado ou já utilizado.",
         )
 
-    if (
-        verification.attempts
-        >= PROFESSOR_SIGNUP_MAX_ATTEMPTS
-    ):
+    if verification.attempts >= settings.PROFESSOR_SIGNUP_MAX_ATTEMPTS:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=(
-                "Muitas tentativas. "
-                "Solicite um novo código."
-            ),
+            detail="Muitas tentativas. Solicite um novo código.",
         )
 
-    received_hash = hash_professor_signup_code(
-        normalized_email,
-        code,
-    )
-
-    if not hmac.compare_digest(
-        received_hash,
-        verification.code_hash,
-    ):
+    received_hash = hash_professor_signup_code(normalized_email, code)
+    if not hmac.compare_digest(received_hash, verification.code_hash):
         await professor_signup_repository.increment_attempts(
             db=db,
             verification=verification,
         )
-
         await db.commit()
-
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Código inválido ou expirado.",
@@ -230,9 +183,7 @@ async def verify_professor_signup_code(
             db=db,
             verification=verification,
         )
-
         await db.commit()
-
     except Exception:
         await db.rollback()
         raise
@@ -241,54 +192,32 @@ async def verify_professor_signup_code(
         email=normalized_email,
         verification_id=verification.id,
     )
-
     return {
         "signup_token": signup_token,
         "token_type": "bearer",
-        "expires_in": (
-            PROFESSOR_SIGNUP_TOKEN_EXPIRE_MINUTES * 60
-        ),
+        "expires_in": settings.PROFESSOR_SIGNUP_TOKEN_EXPIRE_MINUTES * 60,
     }
 
-def decode_professor_signup_token(
-    signup_token: str,
-) -> tuple[str, UUID]:
+
+def decode_professor_signup_token(signup_token: str) -> tuple[str, UUID]:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Token de cadastro inválido ou expirado.",
     )
-
     try:
         payload = jwt.decode(
             signup_token,
             settings.JWT_SECRET,
             algorithms=[settings.ALGORITHM],
         )
-
         email = payload.get("sub")
         token_type = payload.get("type")
-        verification_id = payload.get(
-            "verification_id"
-        )
-
-        if (
-            not email
-            or token_type != "professor_signup"
-            or not verification_id
-        ):
+        verification_id = payload.get("verification_id")
+        if not email or token_type != "professor_signup" or not verification_id:
             raise credentials_exception
-
-        verification_uuid = UUID(
-            verification_id
-        )
-
-    except (
-        exceptions.JWTError,
-        ValueError,
-    ):
+        return email, UUID(verification_id)
+    except (exceptions.JWTError, ValueError, TypeError):
         raise credentials_exception
-
-    return email, verification_uuid
 
 
 async def complete_professor_signup(
@@ -298,185 +227,88 @@ async def complete_professor_signup(
     email: str,
     password: str,
 ):
-    # ---------------------------------------------------------
-    # 1. Valida e decodifica o token temporário
-    # ---------------------------------------------------------
-
-    institutional_email, verification_id = (
-        decode_professor_signup_token(
-            signup_token
-        )
-    )
-
+    institutional_email, verification_id = decode_professor_signup_token(signup_token)
     institutional_email = institutional_email.strip().lower()
     email = email.strip().lower()
     username = username.strip()
 
-    # ---------------------------------------------------------
-    # 2. Busca a verificação no banco
-    # ---------------------------------------------------------
-
-    verification = (
-        await professor_signup_repository.get_by_id(
-            db=db,
-            verification_id=verification_id,
-        )
+    verification = await professor_signup_repository.get_by_id(
+        db=db,
+        verification_id=verification_id,
     )
-
-    # ---------------------------------------------------------
-    # 3. Valida o estado da verificação
-    # ---------------------------------------------------------
-
-    if verification is None:
+    if verification is None or verification.email != institutional_email:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token de cadastro inválido.",
         )
-
-    if verification.email != institutional_email:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token de cadastro inválido.",
-        )
-
     if verification.verified_at is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="O email institucional ainda não foi verificado.",
         )
-
     if verification.completed_at is not None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
+            status_code=status.HTTP_409_CONFLICT,
             detail="Este cadastro já foi concluído.",
         )
 
-    # ---------------------------------------------------------
-    # 4. Verifica se o email escolhido já está em uso
-    # ---------------------------------------------------------
-
-    existing_email = await get_user_by_email(
-        db,
-        email,
-    )
-
-    if existing_email is not None:
+    if await get_user_by_email(db, email) is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Já existe uma conta com esse email.",
         )
-
-    # ---------------------------------------------------------
-    # 5. Verifica se o username já está em uso
-    # ---------------------------------------------------------
-
-    existing_username = await get_user_by_username(
-        db,
-        username,
-    )
-
-    if existing_username is not None:
+    if await get_user_by_username(db, username) is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Username já está em uso.",
         )
 
-    # ---------------------------------------------------------
-    # 6. Valida a senha
-    # ---------------------------------------------------------
-
     try:
-        password = validate_strong_password(
-            password
-        )
-
+        password = validate_strong_password(password)
     except ValueError as error:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(error),
-        )
-
-    # ---------------------------------------------------------
-    # 7. Cria hash da senha
-    # ---------------------------------------------------------
-
-    hashed_password = get_password_hash(
-        password
-    )
-
-    # ---------------------------------------------------------
-    # 8. Cria o professor
-    # ---------------------------------------------------------
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 
     try:
         user = await create_verified_teacher(
             db=db,
             username=username,
             email=email,
-            hashed_password=hashed_password,
+            hashed_password=get_password_hash(password),
         )
-
-        # O processo de signup não pode ser reutilizado
         await professor_signup_repository.mark_as_completed(
             db=db,
             verification=verification,
         )
-
         await db.commit()
         await db.refresh(user)
-
     except IntegrityError:
         await db.rollback()
-
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Email ou username já está em uso.",
         )
-
     except Exception:
         await db.rollback()
         raise
 
-    # ---------------------------------------------------------
-    # 9. Cria o access token normal
-    # ---------------------------------------------------------
-
-    access_token_expires = timedelta(
-        minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
-    )
-
-    access_token = create_access_token(
-        data={
-            "sub": str(user.id),
-            "type": "access",
-        },
-        expires_delta=access_token_expires,
-    )
-
     return {
-        "access_token": access_token,
+        "access_token": create_access_token(
+            data={"sub": str(user.id), "type": "access"},
+            expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
+        ),
         "token_type": "bearer",
     }
 
-async def authenticate_user(
-    db: AsyncSession,
-    email: str,
-    password: str,
-):
-    user = await get_user_by_email(db, email)
 
-    if user is None:
+async def authenticate_user(db: AsyncSession, email: str, password: str):
+    user = await get_user_by_email(db, email.strip().lower())
+    if user is None or not verify_password(password, user.hashed_password):
         return None
-
-    if not verify_password(password, user.hashed_password):
-        return None
-
     if user.email_verified_at is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Email não verificado. Por favor, verifique seu email antes de fazer login",
+            detail="Email não verificado. Verifique seu email antes de fazer login.",
         )
-
     return user
 
 
@@ -487,54 +319,43 @@ async def register_user(
     role: UserRole,
     password: str,
 ):
-
     if role == UserRole.teacher:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Não é possível registrar um professor diretamente. Professores devem se registrar através do fluxo de cadastro de professores.",
+            detail=(
+                "Não é possível registrar um professor diretamente. "
+                "Use o fluxo /auth/professor/signup/*."
+            ),
         )
 
+    username = username.strip()
     try:
         email = validate_teacher_institutional_email(email, role)
         password = validate_strong_password(password)
-
     except ValueError as error:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(error),
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
 
-    exists_email = await get_user_by_email(db, email)
-
-    if exists_email is not None:
+    if await get_user_by_email(db, email) is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Já existe um usuário com esse email!",
         )
-
-    exists_username = await get_user_by_username(db, username)
-
-    if exists_username is not None:
+    if await get_user_by_username(db, username) is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Já existe um usuário com esse username!",
         )
-
-    user_role = resolve_registration_role(email, role)
-    hashed_password = get_password_hash(password)
 
     try:
         return await create_user(
             db,
             username,
             email,
-            user_role,
-            hashed_password,
+            resolve_registration_role(role),
+            get_password_hash(password),
         )
-
     except IntegrityError:
         await db.rollback()
-
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Email ou username já está em uso!",
@@ -550,97 +371,58 @@ async def get_current_user(
         detail="Não foi possível validar as credenciais",
         headers={"WWW-Authenticate": "Bearer"},
     )
-
     try:
         payload = jwt.decode(
             token,
             settings.JWT_SECRET,
             algorithms=[settings.ALGORITHM],
         )
-
         user_id = payload.get("sub")
-        token_type = payload.get("type")
-
-        if user_id is None or token_type != "access":
+        if user_id is None or payload.get("type") != "access":
             raise credentials_exception
-
         user_uuid = UUID(user_id)
-
-    except (exceptions.JWTError, ValueError):
+    except (exceptions.JWTError, ValueError, TypeError):
         raise credentials_exception
 
     user = await get_user_by_id(db, user_uuid)
-
     if user is None:
         raise credentials_exception
-
     if user.email_verified_at is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Email não verificado",
         )
-
     return user
 
 
 def require_role(required_role: UserRole):
-    async def role_checker(
-        current_user: UserModel = Depends(get_current_user),
-    ):
+    async def role_checker(current_user: UserModel = Depends(get_current_user)):
         required_role_value = (
-            required_role.value
-            if isinstance(required_role, UserRole)
-            else required_role
+            required_role.value if isinstance(required_role, UserRole) else required_role
         )
-
         if current_user.role != required_role_value:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Você não tem permissão para acessar essa rota",
             )
-
         return current_user
 
     return role_checker
 
 
-async def _get_class_or_404(
-    db: AsyncSession,
-    course_class_id: str,
-):
+async def _get_class_or_404(db: AsyncSession, course_class_id: str | UUID):
     course_class_uuid = deps.validate_uuid(course_class_id)
-
-    course_class = await get_class_by_id(
-        db=db,
-        course_class_id=course_class_uuid,
-    )
-
+    course_class = await get_class_by_id(db=db, course_class_id=course_class_uuid)
     if course_class is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Essa turma não existe",
-        )
-
+        raise HTTPException(status_code=404, detail="Essa turma não existe")
     return course_class
 
 
-async def _get_activity_or_404(
-    db: AsyncSession,
-    activity_id: str,
-):
+async def _get_activity_or_404(db: AsyncSession, activity_id: str | UUID):
     activity_uuid = deps.validate_uuid(activity_id)
-
-    activity = await get_activity_by_id(
-        db=db,
-        activity_id=activity_uuid,
-    )
-
+    activity = await get_activity_by_id(db=db, activity_id=activity_uuid)
     if activity is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Essa atividade não existe",
-        )
-
+        raise HTTPException(status_code=404, detail="Essa atividade não existe")
     return activity
 
 
@@ -650,23 +432,9 @@ def require_teacher_class():
         current_user: UserModel = Depends(get_current_user),
         db: AsyncSession = Depends(deps.get_session),
     ):
-        course_class = await _get_class_or_404(
-            db=db,
-            course_class_id=course_class_id,
-        )
-
-        allowed = await is_teacher_of_class(
-            db=db,
-            user_id=current_user.id,
-            course_class_id=course_class.id,
-        )
-
-        if not allowed:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Você não é o responsável por essa turma",
-            )
-
+        course_class = await _get_class_or_404(db, course_class_id)
+        if not await is_teacher_of_class(db, current_user.id, course_class.id):
+            raise HTTPException(status_code=403, detail="Você não é o responsável por essa turma")
         return course_class
 
     return checker
@@ -678,23 +446,9 @@ def require_student_class():
         current_user: UserModel = Depends(get_current_user),
         db: AsyncSession = Depends(deps.get_session),
     ):
-        course_class = await _get_class_or_404(
-            db=db,
-            course_class_id=course_class_id,
-        )
-
-        allowed = await is_student_of_class(
-            db=db,
-            user_id=current_user.id,
-            course_class_id=course_class.id,
-        )
-
-        if not allowed:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Você não é aluno dessa turma",
-            )
-
+        course_class = await _get_class_or_404(db, course_class_id)
+        if not await is_student_of_class(db, current_user.id, course_class.id):
+            raise HTTPException(status_code=403, detail="Você não é aluno dessa turma")
         return course_class
 
     return checker
@@ -706,23 +460,9 @@ def require_monitor_class():
         current_user: UserModel = Depends(get_current_user),
         db: AsyncSession = Depends(deps.get_session),
     ):
-        course_class = await _get_class_or_404(
-            db=db,
-            course_class_id=course_class_id,
-        )
-
-        allowed = await is_monitor_of_class(
-            db=db,
-            user_id=current_user.id,
-            course_class_id=course_class.id,
-        )
-
-        if not allowed:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Você não é monitor dessa turma",
-            )
-
+        course_class = await _get_class_or_404(db, course_class_id)
+        if not await is_monitor_of_class(db, current_user.id, course_class.id):
+            raise HTTPException(status_code=403, detail="Você não é monitor dessa turma")
         return course_class
 
     return checker
@@ -734,23 +474,12 @@ def require_teacher_or_monitor_class():
         current_user: UserModel = Depends(get_current_user),
         db: AsyncSession = Depends(deps.get_session),
     ):
-        course_class = await _get_class_or_404(
-            db=db,
-            course_class_id=course_class_id,
-        )
-
-        allowed = await has_class_write_permission(
-            db=db,
-            user_id=current_user.id,
-            course_class_id=course_class.id,
-        )
-
-        if not allowed:
+        course_class = await _get_class_or_404(db, course_class_id)
+        if not await has_class_write_permission(db, current_user.id, course_class.id):
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
+                status_code=403,
                 detail="Apenas professor ou monitor podem realizar essa ação",
             )
-
         return course_class
 
     return checker
@@ -762,23 +491,9 @@ def require_class_access():
         current_user: UserModel = Depends(get_current_user),
         db: AsyncSession = Depends(deps.get_session),
     ):
-        course_class = await _get_class_or_404(
-            db=db,
-            course_class_id=course_class_id,
-        )
-
-        allowed = await has_class_read_permission(
-            db=db,
-            user_id=current_user.id,
-            course_class_id=course_class.id,
-        )
-
-        if not allowed:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Você não tem acesso a essa turma",
-            )
-
+        course_class = await _get_class_or_404(db, course_class_id)
+        if not await has_class_read_permission(db, current_user.id, course_class.id):
+            raise HTTPException(status_code=403, detail="Você não tem acesso a essa turma")
         return course_class
 
     return checker
@@ -790,23 +505,12 @@ def require_teacher_or_monitor_activity():
         current_user: UserModel = Depends(get_current_user),
         db: AsyncSession = Depends(deps.get_session),
     ):
-        activity = await _get_activity_or_404(
-            db=db,
-            activity_id=activity_id,
-        )
-
-        allowed = await has_class_write_permission(
-            db=db,
-            user_id=current_user.id,
-            course_class_id=activity.course_class_id,
-        )
-
-        if not allowed:
+        activity = await _get_activity_or_404(db, activity_id)
+        if not await has_class_write_permission(db, current_user.id, activity.course_class_id):
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
+                status_code=403,
                 detail="Apenas professor ou monitor podem alterar essa atividade",
             )
-
         return activity
 
     return checker
@@ -818,23 +522,9 @@ def require_activity_access():
         current_user: UserModel = Depends(get_current_user),
         db: AsyncSession = Depends(deps.get_session),
     ):
-        activity = await _get_activity_or_404(
-            db=db,
-            activity_id=activity_id,
-        )
-
-        allowed = await has_class_read_permission(
-            db=db,
-            user_id=current_user.id,
-            course_class_id=activity.course_class_id,
-        )
-
-        if not allowed:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Você não tem acesso a essa atividade",
-            )
-
+        activity = await _get_activity_or_404(db, activity_id)
+        if not await has_class_read_permission(db, current_user.id, activity.course_class_id):
+            raise HTTPException(status_code=403, detail="Você não tem acesso a essa atividade")
         return activity
 
     return checker

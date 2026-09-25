@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mentoria}
+      POSTGRES_USER: ${POSTGRES_USER:-mentoria}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mentoria}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mentoria} -d ${POSTGRES_DB:-mentoria}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  api:
+    build: .
+    env_file:
+      - .env
+    environment:
+      DB_URL: postgresql+asyncpg://${POSTGRES_USER:-mentoria}:${POSTGRES_PASSWORD:-mentoria}@db:5432/${POSTGRES_DB:-mentoria}
+      MAIL_HOST: ${DOCKER_MAIL_HOST:-mailpit}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

@@ -1,461 +1,170 @@
-import logging
-
-from typing import Optional
 from uuid import UUID
 
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from models.course_class_model import CourseClassModel
-from models.user_model import UserRole
-
-from repositories import course_class_repository, user_repository
-
-from repositories.activity_repository import is_teacher_of_class
-from schemas.course_class_schema import (
-    CourseClassBase,
-    CourseClassRegister,
-)
-
 from sqlalchemy.orm import selectinload
 
 from models.course_class_model import (
     CourseClassModel,
-    course_class_students,
     course_class_monitors,
+    course_class_students,
 )
+from models.user_model import UserModel
+from schemas.course_class_schema import CourseClassRegister
 
 
-logger = logging.getLogger(__name__)
+def _with_relationships(stmt):
+    return stmt.options(
+        selectinload(CourseClassModel.activities),
+        selectinload(CourseClassModel.monitor),
+        selectinload(CourseClassModel.students),
+    )
 
 
-async def create(
+def _apply_filters(stmt, name=None, discipline=None, status=None):
+    if name:
+        stmt = stmt.where(CourseClassModel.name.ilike(f"%{name}%"))
+    if discipline:
+        stmt = stmt.where(CourseClassModel.discipline.ilike(f"%{discipline}%"))
+    if status:
+        stmt = stmt.where(CourseClassModel.status == status)
+    return stmt
+
+
+async def create(db: AsyncSession, course_class: CourseClassRegister) -> CourseClassModel:
+    db_class = CourseClassModel(**course_class.model_dump())
+    db.add(db_class)
+    await db.commit()
+    return await get_class_by_id(db, db_class.id)
+
+
+async def get_teacher_classes(
     db: AsyncSession,
-    course_class: CourseClassBase,
     teacher_id: UUID,
+    name: str | None = None,
+    discipline: str | None = None,
+    status: str | None = None,
+    skip: int = 0,
+    limit: int = 10,
 ):
-    course_class_register = CourseClassRegister(
-        name=course_class.name,
-        discipline=course_class.discipline,
-        teacher_id=teacher_id,
-    )
-
-    try:
-        return await course_class_repository.create(db, course_class_register)
-
-    except Exception:
-        logger.exception("Erro ao criar turma")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro interno do servidor",
-        )
-
-
-async def get_classes(
-    db: AsyncSession,
-    teacher_id: UUID,
-    course_class_id: Optional[UUID] = None,
-    **filters,
-):
-    if course_class_id is None:
-        return await course_class_repository.get_teacher_classes(
-            db=db,
-            teacher_id=teacher_id,
-            **filters,
-        )
-
-    course_class = await course_class_repository.get_class_by_id(
-        db=db,
-        course_class_id=course_class_id,
-    )
-
-    if course_class is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Turma não encontrada",
-        )
-
-    allowed = await course_class_repository.is_teacher_of_class(
-        db=db,
-        user_id=teacher_id,
-        course_class_id=course_class.id,
-    )
-
-    if not allowed:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Você não tem permissão para acessar essa turma",
-        )
-
-    return course_class
+    stmt = select(CourseClassModel).where(CourseClassModel.teacher_id == teacher_id)
+    stmt = _apply_filters(stmt, name, discipline, status)
+    stmt = _with_relationships(stmt.order_by(CourseClassModel.name).offset(skip).limit(limit))
+    result = await db.execute(stmt)
+    return list(result.scalars().unique().all())
 
 
 async def get_student_classes(
     db: AsyncSession,
     student_id: UUID,
-    course_class_id: Optional[UUID] = None,
-    **filters,
+    name: str | None = None,
+    discipline: str | None = None,
+    status: str | None = None,
+    skip: int = 0,
+    limit: int = 10,
 ):
-    if course_class_id is None:
-        return await course_class_repository.get_student_classes(
-            db=db,
-            student_id=student_id,
-            **filters,
-        )
-
-    course_class = await course_class_repository.get_class_by_id(
-        db=db,
-        course_class_id=course_class_id,
+    stmt = (
+        select(CourseClassModel)
+        .join(course_class_students, course_class_students.c.course_class_id == CourseClassModel.id)
+        .where(course_class_students.c.student_id == student_id)
     )
-
-    if course_class is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Turma não encontrada",
-        )
-
-    allowed = await course_class_repository.is_student_of_class(
-        db=db,
-        user_id=student_id,
-        course_class_id=course_class.id,
-    )
-
-    if not allowed:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Você não é aluno dessa turma",
-        )
-
-    return course_class
+    stmt = _apply_filters(stmt, name, discipline, status)
+    stmt = _with_relationships(stmt.order_by(CourseClassModel.name).offset(skip).limit(limit))
+    result = await db.execute(stmt)
+    return list(result.scalars().unique().all())
 
 
 async def get_monitor_classes(
     db: AsyncSession,
     student_id: UUID,
-    course_class_id: Optional[UUID] = None,
-    **filters,
+    name: str | None = None,
+    discipline: str | None = None,
+    status: str | None = None,
+    skip: int = 0,
+    limit: int = 10,
 ):
-    if course_class_id is None:
-        return await course_class_repository.get_monitor_classes(
-            db=db,
-            student_id=student_id,
-            **filters,
-        )
-
-    course_class = await course_class_repository.get_class_by_id(
-        db=db,
-        course_class_id=course_class_id,
-    )
-
-    if course_class is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Turma não encontrada",
-        )
-
-    allowed = await course_class_repository.is_monitor_of_class(
-        db=db,
-        user_id=student_id,
-        course_class_id=course_class.id,
-    )
-
-    if not allowed:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Você não é monitor dessa turma",
-        )
-
-    return course_class
-
-
-async def add_monitor(
-    course_class,
-    monitor_email: str,
-    db: AsyncSession,
-):
-    monitor = await user_repository.get_user_by_email(db, email=monitor_email)
-
-    if monitor is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Usuário não encontrado",
-        )
-
-    if monitor.role != UserRole.student.value:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Apenas estudantes podem ser monitores",
-        )
-
-    already_monitor = await course_class_repository.is_monitor_of_class(
-        db=db,
-        user_id=monitor.id,
-        course_class_id=course_class.id,
-    )
-
-    if already_monitor:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Esse aluno já é monitor da turma",
-        )
-
-    try:
-        return await course_class_repository.add_monitor(
-            db=db,
-            course_class=course_class,
-            new_monitor=monitor,
-        )
-
-    except Exception:
-        logger.exception("Erro ao adicionar monitor na turma")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro interno do servidor",
-        )
-
-
-async def add_student(
-    course_class,
-    student_email: str,
-    db: AsyncSession,
-):
-    student = await user_repository.get_user_by_email(db, email=student_email)
-
-    if student is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Usuário não encontrado",
-        )
-
-    if student.role != UserRole.student.value:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Apenas estudantes podem ser adicionados na turma",
-        )
-
-    already_student = await course_class_repository.is_student_of_class(
-        db=db,
-        user_id=student.id,
-        course_class_id=course_class.id,
-    )
-
-    if already_student:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Esse aluno já foi adicionado na turma",
-        )
-
-    try:
-        return await course_class_repository.add_student(
-            db=db,
-            course_class=course_class,
-            new_student=student,
-        )
-
-    except Exception:
-        logger.exception("Erro ao adicionar aluno na turma")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro interno do servidor",
-        )
-
-
-async def remove_monitor(
-    course_class,
-    monitor_id: UUID,
-    db: AsyncSession,
-):
-    monitor = await user_repository.get_user_by_id(db, monitor_id)
-
-    if monitor is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Usuário não encontrado",
-        )
-
-    is_monitor = await course_class_repository.is_monitor_of_class(
-        db=db,
-        user_id=monitor.id,
-        course_class_id=course_class.id,
-    )
-
-    if not is_monitor:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="O monitor não faz parte dessa turma",
-        )
-
-    try:
-        return await course_class_repository.remove_monitor(
-            db=db,
-            course_class=course_class,
-            monitor=monitor,
-        )
-
-    except Exception:
-        logger.exception("Erro ao remover monitor da turma")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro interno do servidor",
-        )
-
-
-async def remove_student(
-    course_class,
-    student_id: UUID,
-    db: AsyncSession,
-):
-    student = await user_repository.get_user_by_id(db, student_id)
-
-    if student is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Usuário não encontrado",
-        )
-
-    is_student = await course_class_repository.is_student_of_class(
-        db=db,
-        user_id=student.id,
-        course_class_id=course_class.id,
-    )
-
-    if not is_student:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="O aluno não faz parte dessa turma",
-        )
-
-    try:
-        return await course_class_repository.remove_student(
-            db=db,
-            course_class=course_class,
-            student=student,
-        )
-
-    except Exception:
-        logger.exception("Erro ao remover aluno da turma")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro interno do servidor",
-        )
-    
-async def get_class_by_id(
-    db: AsyncSession,
-    course_class_id: UUID,
-):
-    query = (
+    stmt = (
         select(CourseClassModel)
-        .options(
-            selectinload(CourseClassModel.activities),
-            selectinload(CourseClassModel.monitor),
-            selectinload(CourseClassModel.students),
+        .join(course_class_monitors, course_class_monitors.c.course_class_id == CourseClassModel.id)
+        .where(course_class_monitors.c.monitor_id == student_id)
+    )
+    stmt = _apply_filters(stmt, name, discipline, status)
+    stmt = _with_relationships(stmt.order_by(CourseClassModel.name).offset(skip).limit(limit))
+    result = await db.execute(stmt)
+    return list(result.scalars().unique().all())
+
+
+async def get_class_by_id(db: AsyncSession, course_class_id: UUID):
+    stmt = _with_relationships(
+        select(CourseClassModel).where(CourseClassModel.id == course_class_id)
+    )
+    result = await db.execute(stmt)
+    return result.scalars().unique().first()
+
+
+async def add_monitor(db: AsyncSession, course_class: CourseClassModel, new_monitor: UserModel):
+    course_class.monitor.append(new_monitor)
+    await db.commit()
+    return await get_class_by_id(db, course_class.id)
+
+
+async def add_student(db: AsyncSession, course_class: CourseClassModel, new_student: UserModel):
+    course_class.students.append(new_student)
+    await db.commit()
+    return await get_class_by_id(db, course_class.id)
+
+
+async def remove_monitor(db: AsyncSession, course_class: CourseClassModel, monitor: UserModel):
+    course_class.monitor.remove(monitor)
+    await db.commit()
+    return await get_class_by_id(db, course_class.id)
+
+
+async def remove_student(db: AsyncSession, course_class: CourseClassModel, student: UserModel):
+    course_class.students.remove(student)
+    await db.commit()
+    return await get_class_by_id(db, course_class.id)
+
+
+async def is_teacher_of_class(db: AsyncSession, user_id: UUID, course_class_id: UUID) -> bool:
+    result = await db.execute(
+        select(CourseClassModel.id).where(
+            CourseClassModel.id == course_class_id,
+            CourseClassModel.teacher_id == user_id,
         )
-        .where(CourseClassModel.id == course_class_id)
     )
+    return result.scalar_one_or_none() is not None
 
-    result = await db.execute(query)
 
-    return result.scalars().first()
-
-    async def is_teacher_of_class(
-    db: AsyncSession,
-    user_id: UUID,
-    course_class_id: UUID,
-) -> bool:
-        query = (
-            select(CourseClassModel.id).where(
-                CourseClassModel.id == course_class_id,
-                CourseClassModel.teacher_id == user_id,
-            )
+async def is_monitor_of_class(db: AsyncSession, user_id: UUID, course_class_id: UUID) -> bool:
+    result = await db.execute(
+        select(course_class_monitors.c.course_class_id).where(
+            course_class_monitors.c.course_class_id == course_class_id,
+            course_class_monitors.c.monitor_id == user_id,
         )
-    
-
-    result = await db.execute(query)
-
+    )
     return result.scalar_one_or_none() is not None
 
 
-async def is_monitor_of_class(
-    db: AsyncSession,
-    user_id: UUID,
-    course_class_id: UUID,
-) -> bool:
-    query = select(course_class_monitors.c.course_class_id).where(
-        course_class_monitors.c.course_class_id == course_class_id,
-        course_class_monitors.c.monitor_id == user_id,
+async def is_student_of_class(db: AsyncSession, user_id: UUID, course_class_id: UUID) -> bool:
+    result = await db.execute(
+        select(course_class_students.c.course_class_id).where(
+            course_class_students.c.course_class_id == course_class_id,
+            course_class_students.c.student_id == user_id,
+        )
     )
-
-    result = await db.execute(query)
-
     return result.scalar_one_or_none() is not None
 
 
-async def is_student_of_class(
-    db: AsyncSession,
-    user_id: UUID,
-    course_class_id: UUID,
-) -> bool:
-    query = select(course_class_students.c.course_class_id).where(
-        course_class_students.c.course_class_id == course_class_id,
-        course_class_students.c.student_id == user_id,
+async def has_class_write_permission(db: AsyncSession, user_id: UUID, course_class_id: UUID) -> bool:
+    return await is_teacher_of_class(db, user_id, course_class_id) or await is_monitor_of_class(
+        db, user_id, course_class_id
     )
 
-    result = await db.execute(query)
 
-    return result.scalar_one_or_none() is not None
-
-
-async def has_class_write_permission(
-    db: AsyncSession,
-    user_id: UUID,
-    course_class_id: UUID,
-) -> bool:
-    is_teacher = await is_teacher_of_class(
-        db=db,
-        user_id=user_id,
-        course_class_id=course_class_id,
+async def has_class_read_permission(db: AsyncSession, user_id: UUID, course_class_id: UUID) -> bool:
+    return (
+        await is_teacher_of_class(db, user_id, course_class_id)
+        or await is_monitor_of_class(db, user_id, course_class_id)
+        or await is_student_of_class(db, user_id, course_class_id)
     )
-
-    if is_teacher:
-        return True
-
-    is_monitor = await is_monitor_of_class(
-        db=db,
-        user_id=user_id,
-        course_class_id=course_class_id,
-    )
-
-    return is_monitor
-
-
-async def has_class_read_permission(
-    db: AsyncSession,
-    user_id: UUID,
-    course_class_id: UUID,
-) -> bool:
-    is_teacher = await is_teacher_of_class(
-        db=db,
-        user_id=user_id,
-        course_class_id=course_class_id,
-    )
-
-    if is_teacher:
-        return True
-
-    is_monitor = await is_monitor_of_class(
-        db=db,
-        user_id=user_id,
-        course_class_id=course_class_id,
-    )
-
-    if is_monitor:
-        return True
-
-    is_student = await is_student_of_class(
-        db=db,
-        user_id=user_id,
-        course_class_id=course_class_id,
-    )
-
-    return is_student

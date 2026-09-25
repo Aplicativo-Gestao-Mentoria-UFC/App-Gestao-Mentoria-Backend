@@ -41,3 +41,9 @@ build/
 # OS generated files
 .DS_Store
 Thumbs.db
+
+#test-summaries
+api-test-reports
+
+#github-actions
+.github/workflows
